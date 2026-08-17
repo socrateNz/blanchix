@@ -14,6 +14,12 @@ export const metadata: Metadata = {
     title: "Blanchix",
   },
   icons: {
+    // Mêmes fichiers que les icônes PWA du manifest (voir manifest.ts) — favicon d'onglet et
+    // icône de l'app installée doivent être visuellement identiques, pas juste similaires.
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
     apple: "/icons/apple-touch-icon.png",
   },
 };
