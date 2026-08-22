@@ -2,20 +2,22 @@ import mongoose, { Schema, type InferSchemaType } from "mongoose";
 
 export const USER_ROLES = ["client", "admin", "operateur", "livreur", "super_admin"] as const;
 
-const AdresseUserSchema = new Schema(
-  {
-    label: { type: String, trim: true },
-    quartier: { type: String, trim: true },
-    rue: { type: String, trim: true },
-    gps: {
-      lat: Number,
-      lng: Number,
-    },
-    instructions: { type: String, trim: true },
-    parDefaut: { type: Boolean, default: false },
+// Adresses enregistrées par le client (ex. "résidence") — réutilisables lors d'une commande
+// plutôt que ressaisies à chaque fois (voir /api/mes-adresses et l'étape adresse du tunnel de
+// commande). Contrairement à PushSubscriptionSchema plus bas, on garde ici l'_id auto de
+// Mongoose (pas de { _id: false }) : une adresse doit pouvoir être ciblée individuellement par
+// id pour être supprimée/mise à jour, sans clé naturelle fiable comme l'endpoint d'un push.
+const AdresseUserSchema = new Schema({
+  label: { type: String, trim: true },
+  quartier: { type: String, trim: true },
+  rue: { type: String, trim: true },
+  gps: {
+    lat: Number,
+    lng: Number,
   },
-  { _id: false }
-);
+  instructions: { type: String, trim: true },
+  parDefaut: { type: Boolean, default: false },
+});
 
 const PushSubscriptionSchema = new Schema(
   {
