@@ -6,10 +6,17 @@ import { useQuery } from "@tanstack/react-query";
 import { Search } from "lucide-react";
 import { api } from "@/lib/axios";
 import { formatFCFA } from "@/lib/utils";
-import { ORDER_STATUSES, STATUT_LABELS, type OrderStatus } from "@/lib/orderStatuses";
+import {
+  STATUTS_COMMANDE_AFFICHE,
+  STATUT_COMMANDE_AFFICHE_LABELS,
+  deriveStatutCommandeAffiche,
+  type OrderStatus,
+} from "@/lib/orderStatuses";
+import { STATUT_PAIEMENT_AFFICHE_LABELS, deriveStatutPaiementAffiche } from "@/lib/paiement";
 import { inputClasses } from "@/components/ui/Field";
 import Button from "@/components/ui/Button";
 import StatutBadge from "@/components/admin/StatutBadge";
+import CommandeActionsMenu from "@/components/admin/CommandeActionsMenu";
 
 interface Commande {
   id: string;
@@ -19,6 +26,9 @@ interface Commande {
   total: number;
   delai: string;
   createdAt: string;
+  livreurCollecte: { nom: string; prenom?: string } | null;
+  livreurLivraison: { nom: string; prenom?: string } | null;
+  paiement: { methode: string | null; statut: string | null } | null;
 }
 
 export default function AdminCommandesPage() {
@@ -70,9 +80,9 @@ export default function AdminCommandesPage() {
           }}
         >
           <option value="">Tous les statuts</option>
-          {ORDER_STATUSES.map((s) => (
+          {STATUTS_COMMANDE_AFFICHE.map((s) => (
             <option key={s} value={s}>
-              {STATUT_LABELS[s].label}
+              {STATUT_COMMANDE_AFFICHE_LABELS[s].label}
             </option>
           ))}
         </select>
@@ -92,9 +102,11 @@ export default function AdminCommandesPage() {
                 <tr>
                   <th className="px-4 py-3">Numéro</th>
                   <th className="px-4 py-3">Client</th>
-                  <th className="px-4 py-3">Statut</th>
+                  <th className="px-4 py-3">Statut commande</th>
+                  <th className="px-4 py-3">Statut paiement</th>
                   <th className="px-4 py-3 text-right">Total</th>
                   <th className="px-4 py-3">Date</th>
+                  <th className="px-4 py-3">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -116,17 +128,36 @@ export default function AdminCommandesPage() {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <StatutBadge statut={c.statut} />
+                      <StatutBadge
+                        statut={deriveStatutCommandeAffiche(c.statut)}
+                        labels={STATUT_COMMANDE_AFFICHE_LABELS}
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <StatutBadge
+                        statut={deriveStatutPaiementAffiche(c)}
+                        labels={STATUT_PAIEMENT_AFFICHE_LABELS}
+                      />
                     </td>
                     <td className="px-4 py-3 text-right font-mono">{formatFCFA(c.total)}</td>
                     <td className="px-4 py-3 text-xs text-ardoise">
                       {new Date(c.createdAt).toLocaleString("fr-FR")}
                     </td>
+                    <td className="px-4 py-3">
+                      <CommandeActionsMenu
+                        orderId={c.id}
+                        orderNumero={c.numero}
+                        statut={c.statut}
+                        paiement={c.paiement}
+                        livreurCollecte={c.livreurCollecte}
+                        livreurLivraison={c.livreurLivraison}
+                      />
+                    </td>
                   </tr>
                 ))}
                 {data.commandes.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-6 text-center text-ardoise">
+                    <td colSpan={7} className="px-4 py-6 text-center text-ardoise">
                       Aucune commande trouvée.
                     </td>
                   </tr>

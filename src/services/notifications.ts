@@ -6,7 +6,12 @@ import type { OrderStatus } from "@/lib/orderStatuses";
 import { sendMail } from "@/lib/mailer";
 import { envoyerPush } from "@/lib/webpush";
 import { genererRecuPdf } from "@/services/receipt";
-import { buildEmailBienvenue, buildEmailConfirmationCommande, buildEmailStatutCommande } from "@/services/emailTemplates";
+import {
+  buildEmailBienvenue,
+  buildEmailConfirmationCommande,
+  buildEmailStatutCommande,
+  buildEmailAssignationLivreur,
+} from "@/services/emailTemplates";
 
 type UserHydrated = mongoose.HydratedDocument<UserDocument>;
 type OrderHydrated = mongoose.HydratedDocument<OrderDocument>;
@@ -125,6 +130,21 @@ export async function notifierCommandeConfirmee(order: OrderHydrated): Promise<v
     title: subject,
     body: "Touchez pour voir le détail de votre commande.",
     url: `/suivi/${order._id}`,
+  });
+}
+
+export async function notifierAssignationLivreur(
+  order: OrderHydrated,
+  livreur: UserHydrated,
+  type: "collecte" | "livraison"
+): Promise<void> {
+  const { subject, html } = buildEmailAssignationLivreur(order, livreur, type);
+  await envoyer({
+    destinataireId: String(livreur._id),
+    evenement: `assignation_${type}`,
+    email: livreur.email,
+    subject,
+    html,
   });
 }
 

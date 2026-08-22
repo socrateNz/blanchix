@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/mongodb";
 import { requireAdmin } from "@/lib/apiAuth";
+import { STATUTS_BRUTS_PAR_AFFICHAGE_COMMANDE, type StatutCommandeAffiche } from "@/lib/orderStatuses";
 import Order from "@/models/Order";
 import User from "@/models/User";
 
@@ -21,7 +22,13 @@ export async function GET(request: NextRequest) {
   const limit = Math.min(50, Math.max(1, Number(searchParams.get("limit")) || 20));
 
   const filtre: Record<string, unknown> = {};
-  if (statut) filtre.statut = statut;
+  if (statut) {
+    // Le filtre reçoit un statut "affiché" simplifié (voir orderStatuses.ts) — traduit en
+    // ensemble de statuts bruts pour la requête, plutôt qu'une égalité stricte sur le champ
+    // désormais plus granulaire que ce qui est présenté à l'admin.
+    const bruts = STATUTS_BRUTS_PAR_AFFICHAGE_COMMANDE[statut as StatutCommandeAffiche];
+    filtre.statut = bruts ? { $in: bruts } : statut;
+  }
 
   if (q) {
     const regex = new RegExp(echapperRegex(q), "i");
@@ -36,6 +43,8 @@ export async function GET(request: NextRequest) {
       .skip((page - 1) * limit)
       .limit(limit)
       .populate("client", "nom telephone email")
+      .populate("livreurCollecte", "nom prenom")
+      .populate("livreurLivraison", "nom prenom")
       .lean(),
   ]);
 
@@ -51,6 +60,9 @@ export async function GET(request: NextRequest) {
       total: o.total,
       delai: o.delai,
       createdAt: o.createdAt,
+      livreurCollecte: o.livreurCollecte,
+      livreurLivraison: o.livreurLivraison,
+      paiement: o.paiement ? { methode: o.paiement.methode, statut: o.paiement.statut } : null,
     })),
   });
 }

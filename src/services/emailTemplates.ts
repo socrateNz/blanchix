@@ -108,6 +108,29 @@ const MESSAGES_STATUT: Partial<Record<OrderStatus, { sujet: string; corps: strin
   },
 };
 
+export function buildEmailAssignationLivreur(
+  order: {
+    numero: string;
+    adresseCollecte: { quartier: string; rue: string };
+    adresseLivraison: { quartier: string; rue: string };
+  },
+  livreur: { prenom?: string | null; nom: string },
+  type: "collecte" | "livraison"
+): EmailBuild {
+  const adresse = type === "collecte" ? order.adresseCollecte : order.adresseLivraison;
+  const verbe = type === "collecte" ? "collecter" : "livrer";
+  const contenu = `
+    <h1 style="margin:0 0 12px;font-size:20px;color:${MARINE};">Nouvelle commande à ${verbe}</h1>
+    <p style="margin:0 0 8px;font-size:14px;color:#333333;">Bonjour ${livreur.prenom ?? ""} ${livreur.nom},</p>
+    <p style="margin:0 0 16px;font-size:14px;color:#333333;line-height:1.6;">
+      La commande <strong>${order.numero}</strong> vous est assignée pour la ${type === "collecte" ? "collecte" : "livraison"}.
+    </p>
+    <p style="margin:0;font-size:14px;color:#333333;line-height:1.6;">
+      Adresse : ${adresse.quartier}, ${adresse.rue}
+    </p>`;
+  return { subject: `Commande ${order.numero} à ${verbe}`, html: wrapperEmail(contenu) };
+}
+
 export function buildEmailStatutCommande(
   order: { numero: string },
   client: { nom: string },

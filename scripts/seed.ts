@@ -4,9 +4,9 @@
 // donc src/lib/mongodb.ts lirait process.env.MONGODB_URI avant qu'il soit peuplé.
 import bcrypt from "bcryptjs";
 import { dbConnect } from "../src/lib/mongodb";
+import { genererCreneauxAVenir, JOURS_A_VENIR } from "../src/services/slots";
 import { PLAGES_HORAIRES } from "../src/lib/slots-constants";
 import CatalogItem from "../src/models/CatalogItem";
-import DeliverySlot from "../src/models/DeliverySlot";
 import User from "../src/models/User";
 
 const STARTER_CATALOG = [
@@ -18,9 +18,6 @@ const STARTER_CATALOG = [
   { nom: "Chaussures", prixUnitaire: 1500, ordreAffichage: 6 },
   { nom: "Couette", prixUnitaire: 3500, ordreAffichage: 7 },
 ];
-
-const JOURS_A_VENIR = 5;
-const CAPACITE_MAX = 5;
 
 const ADMIN_EMAIL = "admin@blanchix.com";
 const ADMIN_PASSWORD_PAR_DEFAUT = "blanchix-admin-2026";
@@ -37,25 +34,7 @@ async function seedCatalog() {
 }
 
 async function seedSlots() {
-  let count = 0;
-  const today = new Date();
-
-  for (let dayOffset = 1; dayOffset <= JOURS_A_VENIR; dayOffset++) {
-    const date = new Date(today);
-    date.setDate(today.getDate() + dayOffset);
-    date.setHours(0, 0, 0, 0);
-
-    for (const type of ["collecte", "livraison"] as const) {
-      for (const plageHoraire of PLAGES_HORAIRES) {
-        await DeliverySlot.findOneAndUpdate(
-          { date, type, plageHoraire },
-          { $setOnInsert: { capaciteMax: CAPACITE_MAX, reserves: 0, statut: "ouvert" } },
-          { upsert: true, new: true }
-        );
-        count++;
-      }
-    }
-  }
+  const count = await genererCreneauxAVenir();
   console.log(`Créneaux : ${count} créneaux seedés (${JOURS_A_VENIR} jours × ${PLAGES_HORAIRES.length} plages × 2 types).`);
 }
 

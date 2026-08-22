@@ -11,12 +11,20 @@ import {
   STATUT_LABELS,
   STATUTS_ANNULABLES,
   STATUTS_REMBOURSABLES,
+  STATUT_COMMANDE_AFFICHE_LABELS,
+  deriveStatutCommandeAffiche,
   type OrderStatus,
 } from "@/lib/orderStatuses";
 import Button from "@/components/ui/Button";
 import { inputClasses } from "@/components/ui/Field";
 import StatutBadge from "@/components/admin/StatutBadge";
-import { MOYEN_PAIEMENT_LABELS, STATUT_PAIEMENT_LABELS } from "@/lib/paiement";
+import AssignerLivreurDialog from "@/components/admin/AssignerLivreurDialog";
+import {
+  MOYEN_PAIEMENT_LABELS,
+  STATUT_PAIEMENT_LABELS,
+  STATUT_PAIEMENT_AFFICHE_LABELS,
+  deriveStatutPaiementAffiche,
+} from "@/lib/paiement";
 
 interface CommandeDetail {
   id: string;
@@ -29,6 +37,8 @@ interface CommandeDetail {
   adresseLivraison: { quartier: string; rue: string; instructions?: string };
   creneauCollecte: { date: string; plageHoraire: string } | null;
   creneauLivraison: { date: string; plageHoraire: string } | null;
+  livreurCollecte: { nom: string; prenom?: string; whatsapp?: string } | null;
+  livreurLivraison: { nom: string; prenom?: string; whatsapp?: string } | null;
   delai: keyof typeof DELAI_LABELS;
   notesClient?: string;
   sousTotal: number;
@@ -56,7 +66,7 @@ export default function AdminCommandeDetailPage({ params }: { params: Promise<{ 
   });
 
   const transition = useMutation({
-    mutationFn: async (action: "etape_suivante" | "annuler" | "rembourser") => {
+    mutationFn: async (action: "etape_suivante" | "annuler" | "rembourser" | "marquer_paye") => {
       await api.patch(`/admin/orders/${id}`, { action, commentaire: commentaire || undefined });
     },
     onSuccess: () => {
@@ -71,6 +81,7 @@ export default function AdminCommandeDetailPage({ params }: { params: Promise<{ 
   const prochaineEtape = PROCHAINE_ETAPE[data.statut];
   const peutAnnuler = STATUTS_ANNULABLES.includes(data.statut);
   const peutRembourser = STATUTS_REMBOURSABLES.includes(data.statut);
+  const peutMarquerPaye = data.paiement?.methode === "espece" && data.paiement?.statut === "a_percevoir";
 
   return (
     <div className="flex flex-col gap-6">
@@ -81,7 +92,13 @@ export default function AdminCommandeDetailPage({ params }: { params: Promise<{ 
             Créée le {new Date(data.createdAt).toLocaleString("fr-FR")}
           </p>
         </div>
-        <StatutBadge statut={data.statut} />
+        <div className="flex items-center gap-2">
+          <StatutBadge
+            statut={deriveStatutCommandeAffiche(data.statut)}
+            labels={STATUT_COMMANDE_AFFICHE_LABELS}
+          />
+          <StatutBadge statut={deriveStatutPaiementAffiche(data)} labels={STATUT_PAIEMENT_AFFICHE_LABELS} />
+        </div>
       </div>
 
       <div className="rounded-2xl border border-marine/12 bg-white p-4 shadow-sm">
@@ -92,7 +109,19 @@ export default function AdminCommandeDetailPage({ params }: { params: Promise<{ 
               onClick={() => transition.mutate("etape_suivante")}
               disabled={transition.isPending}
             >
-              Faire avancer → {STATUT_LABELS[prochaineEtape].label}
+              Marquer {STATUT_COMMANDE_AFFICHE_LABELS[deriveStatutCommandeAffiche(prochaineEtape)].label.toLowerCase()}
+            </Button>
+          )}
+          {peutMarquerPaye && (
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={transition.isPending}
+              onClick={() => {
+                if (window.confirm("Marquer le paiement en espèces comme perçu ?")) transition.mutate("marquer_paye");
+              }}
+            >
+              Marquer payé
             </Button>
           )}
           {peutAnnuler && (
@@ -125,7 +154,7 @@ export default function AdminCommandeDetailPage({ params }: { params: Promise<{ 
             </Button>
           )}
         </div>
-        {(prochaineEtape || peutAnnuler || peutRembourser) && (
+        {(prochaineEtape || peutMarquerPaye || peutAnnuler || peutRembourser) && (
           <textarea
             className={`mt-3 ${inputClasses}`}
             placeholder="Commentaire (facultatif)"
@@ -188,6 +217,32 @@ export default function AdminCommandeDetailPage({ params }: { params: Promise<{ 
             <p className="mt-2 rounded-lg bg-brume p-2 font-body text-xs text-encre">Note : {data.notesClient}</p>
           )}
         </div>
+      </div>
+
+      <div className="rounded-2xl border border-marine/12 bg-white p-4 shadow-sm">
+        <h2 className="font-body text-sm font-semibold text-marine">Livreurs</h2>
+        <dl className="mt-2 grid grid-cols-2 gap-y-2 font-body text-sm">
+          <dt className="text-ardoise">Collecte</dt>
+          <dd className="flex items-center justify-end gap-2 text-right text-encre">
+            {data.livreurCollecte ? `${data.livreurCollecte.prenom ?? ""} ${data.livreurCollecte.nom}` : "Non assigné"}
+            <AssignerLivreurDialog
+              orderId={id}
+              orderNumero={data.numero}
+              type="collecte"
+              livreurActuel={data.livreurCollecte}
+            />
+          </dd>
+          <dt className="text-ardoise">Livraison</dt>
+          <dd className="flex items-center justify-end gap-2 text-right text-encre">
+            {data.livreurLivraison ? `${data.livreurLivraison.prenom ?? ""} ${data.livreurLivraison.nom}` : "Non assigné"}
+            <AssignerLivreurDialog
+              orderId={id}
+              orderNumero={data.numero}
+              type="livraison"
+              livreurActuel={data.livreurLivraison}
+            />
+          </dd>
+        </dl>
       </div>
 
       <div className="rounded-2xl border border-marine/12 bg-white p-4 shadow-sm">

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ClipboardList, ShoppingBasket, CalendarClock, ScrollText } from "lucide-react";
+import { LayoutDashboard, ClipboardList, ShoppingBasket, CalendarClock, ScrollText, Truck } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -21,6 +21,7 @@ const LIENS = [
   { href: "/admin/commandes", label: "Commandes", icon: ClipboardList },
   { href: "/admin/catalogue", label: "Catalogue", icon: ShoppingBasket },
   { href: "/admin/creneaux", label: "Créneaux", icon: CalendarClock },
+  { href: "/admin/livreurs", label: "Livreurs", icon: Truck },
   { href: "/admin/audit", label: "Audit", icon: ScrollText },
 ] as const;
 

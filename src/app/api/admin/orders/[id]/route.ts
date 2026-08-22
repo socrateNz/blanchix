@@ -22,6 +22,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     .populate("client", "nom telephone email")
     .populate("creneauCollecte")
     .populate("creneauLivraison")
+    .populate("livreurCollecte", "nom prenom whatsapp")
+    .populate("livreurLivraison", "nom prenom whatsapp")
     .lean();
 
   if (!order) {
@@ -46,7 +48,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 const bodySchema = z.object({
-  action: z.enum(["etape_suivante", "annuler", "rembourser"]),
+  action: z.enum(["etape_suivante", "annuler", "rembourser", "marquer_paye"]),
   commentaire: z.string().trim().max(500).optional(),
 });
 
@@ -67,6 +69,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   const statutAvant = order.statut;
+  const paiementStatutAvant = order.paiement?.statut ?? null;
   let nouveauStatut;
   try {
     nouveauStatut = await appliquerTransitionCommande(order, parsed.data.action, user!.id, parsed.data.commentaire);
@@ -77,14 +80,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     throw err;
   }
 
+  // "rembourser"/"marquer_paye" ne touchent que le sous-document paiement (cf.
+  // orderTransitions.ts) — l'audit doit refléter ce qui a réellement changé plutôt que de
+  // toujours parler de "statut" (order.statut est resté identique dans ces deux cas).
+  const toucheSeulementPaiement = parsed.data.action === "rembourser" || parsed.data.action === "marquer_paye";
+
   await logAudit({
     request,
     utilisateurId: user!.id,
-    action: "changement_statut",
+    action: toucheSeulementPaiement ? `paiement_${parsed.data.action}` : "changement_statut",
     cibleType: "Order",
     cibleId: id,
-    ancienneValeur: { statut: statutAvant },
-    nouvelleValeur: { statut: nouveauStatut },
+    ancienneValeur: toucheSeulementPaiement ? { paiementStatut: paiementStatutAvant } : { statut: statutAvant },
+    nouvelleValeur: toucheSeulementPaiement
+      ? { paiementStatut: order.paiement?.statut ?? null }
+      : { statut: nouveauStatut },
   });
 
   try {

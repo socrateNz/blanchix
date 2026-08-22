@@ -31,6 +31,9 @@ const PushSubscriptionSchema = new Schema(
 const UserSchema = new Schema(
   {
     nom: { type: String, required: true, trim: true },
+    // Optionnel — non utilisé pour les clients (un seul champ "nom" suffit historiquement),
+    // renseigné pour les livreurs (section gestion des livreurs, admin/livreurs).
+    prenom: { type: String, trim: true },
     telephone: { type: String, required: true, trim: true, index: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     whatsapp: { type: String, trim: true },
