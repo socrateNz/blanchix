@@ -56,7 +56,7 @@ function getHeaders(): HeadersInit {
   const secretKey = process.env.CODEES_SECRET_KEY;
   if (!apiKey || !secretKey) {
     throw new Error(
-      "CODEES_API_KEY / CODEES_SECRET_KEY manquants. Renseigne-les dans .env.local (identifiants fournis par Codees)."
+      "CODEES_API_KEY / CODEES_SECRET_KEY manquants. Renseigne-les dans .env (identifiants fournis par Codees)."
     );
   }
   return {

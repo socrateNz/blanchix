@@ -8,7 +8,7 @@ function getTransporter() {
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD } = process.env;
   if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASSWORD) {
     throw new Error(
-      "Configuration SMTP manquante. Renseigne SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASSWORD dans .env.local."
+      "Configuration SMTP manquante. Renseigne SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASSWORD dans .env."
     );
   }
 

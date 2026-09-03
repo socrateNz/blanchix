@@ -10,7 +10,7 @@ Le paiement Codees (`src/lib/codees.ts`) est codé contre leur schéma OpenAPI d
 
 ## Démarrage
 
-1. Copier `.env.example` en `.env.local` et renseigner au minimum `MONGODB_URI`.
+1. Copier `.env.example` en `.env` et renseigner au minimum `MONGODB_URI`.
 2. Installer les dépendances : `npm install`
 3. Peupler la base (catalogue de démarrage, créneaux, compte admin) : `npm run seed`
 4. Lancer le serveur de développement : `npm run dev`, puis ouvrir [http://localhost:3000](http://localhost:3000).

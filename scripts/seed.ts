@@ -1,4 +1,4 @@
-// Charge .env.local avant l'exécution du script — voir le flag --env-file dans le script
+// Charge .env avant l'exécution du script — voir le flag --env-file dans le script
 // npm "seed" (package.json). Un `import { config } from "dotenv"` ici ne suffirait pas : les
 // imports ES sont hoistés au-dessus du reste du fichier, y compris devant un appel à config(),
 // donc src/lib/mongodb.ts lirait process.env.MONGODB_URI avant qu'il soit peuplé.

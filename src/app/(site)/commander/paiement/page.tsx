@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import { Banknote, Smartphone } from "lucide-react";
 import { useCommande } from "@/context/useCommande";
 import { api } from "@/lib/axios";
+import { formatFCFA } from "@/lib/utils";
 import { DELAI_LABELS } from "@/lib/pricing-constants";
+import { computeOrderTotals } from "@/services/pricing";
 import Button from "@/components/ui/Button";
 import CartSummary from "@/components/commander/CartSummary";
 import StatutPaiement from "@/components/commander/StatutPaiement";
@@ -33,10 +35,6 @@ export default function StepPaiement() {
   // Toujours false au (re)montage — y compris après le retour de Codees (nouvelle page).
   // Ne passe à true que sur action explicite de l'utilisateur après un échec.
   const [reessayer, setReessayer] = useState(false);
-  // URL de la fenêtre de paiement Codees — conservée pour proposer un lien de secours si la
-  // popup a été bloquée par le navigateur ou fermée par erreur (voir handleConfirmer).
-  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
-  const popupRef = useRef<Window | null>(null);
 
   const orderMutation = useMutation({
     mutationFn: async () => {
@@ -60,16 +58,6 @@ export default function StepPaiement() {
       return data;
     },
   });
-
-  function ouvrirPaiement(url: string) {
-    // Codees interdit l'affichage de sa page de paiement dans une iframe (en-tête
-    // X-Frame-Options: DENY, vérifié directement sur leur réponse) — impossible de l'intégrer
-    // dans un dialogue classique. Une fenêtre popup est le compromis le plus proche : le client
-    // ne quitte pas notre page (qui affiche le suivi de statut juste en dessous), seule une
-    // fenêtre séparée s'ouvre pour le formulaire de paiement lui-même.
-    setCheckoutUrl(url);
-    popupRef.current = window.open(url, "codees-checkout", "width=430,height=760");
-  }
 
   async function handleConfirmer() {
     let orderId = state.orderResult?.id;
@@ -97,42 +85,31 @@ export default function StepPaiement() {
       // l'étape suivante côté serveur — on affiche directement l'écran de confirmation.
       return;
     }
-    ouvrirPaiement(url);
+    // Codees interdit l'affichage de sa page de paiement dans une iframe (en-tête
+    // X-Frame-Options: DENY, vérifié directement sur leur réponse) — aucun dialogue/popup
+    // n'est donc réellement possible pour cette étape. Départ classique vers leur page
+    // hébergée, même onglet — le suivi reprend au retour via l'état persisté (sessionStorage)
+    // plutôt que via les paramètres de l'URL de retour, dont le format exact ajouté par
+    // Codees n'est pas garanti.
+    window.location.assign(url);
   }
 
   if (state.orderResult && !reessayer) {
     return (
-      <div className="flex flex-col gap-4">
-        {checkoutUrl && (
-          <p className="rounded-xl bg-brume p-3 text-center font-body text-xs text-ardoise">
-            Une fenêtre de paiement s&apos;est ouverte. Si elle ne s&apos;affiche pas,{" "}
-            <button
-              type="button"
-              onClick={() => ouvrirPaiement(checkoutUrl)}
-              className="font-semibold text-bleu hover:underline"
-            >
-              cliquez ici pour l&apos;ouvrir
-            </button>
-            .
-          </p>
-        )}
-        <StatutPaiement
-          orderId={state.orderResult.id}
-          onSucces={() => {
-            popupRef.current?.close();
-            dispatch({ type: "RESET" });
-          }}
-          onEchec={() => {
-            popupRef.current?.close();
-            setReessayer(true);
-          }}
-        />
-      </div>
+      <StatutPaiement
+        orderId={state.orderResult.id}
+        onSucces={() => dispatch({ type: "RESET" })}
+        onEchec={() => setReessayer(true)}
+      />
     );
   }
 
   const erreur = orderMutation.error ?? paymentMutation.error;
   const enCours = orderMutation.isPending || paymentMutation.isPending;
+  // Même formule que le serveur (src/services/pricing.ts, source unique de vérité) — simple
+  // aperçu avant validation, le montant réellement facturé est toujours recalculé côté serveur
+  // à la création de la commande (section 6.6), jamais pris tel quel depuis ce calcul client.
+  const totaux = computeOrderTotals(state.articles, state.delai ?? "standard");
 
   return (
     <div className="flex flex-col gap-6">
@@ -143,6 +120,18 @@ export default function StepPaiement() {
 
       <div className="rounded-xl bg-brume p-4">
         <CartSummary articles={state.articles} articlesPersonnalises={state.articlesPersonnalises} />
+        <dl className="mt-3 grid grid-cols-2 gap-y-1 border-t border-ardoise/15 pt-3 font-body text-sm">
+          <dt className="text-ardoise">Frais de livraison</dt>
+          <dd className="text-right font-mono">{formatFCFA(totaux.fraisLivraison)}</dd>
+          {totaux.majorationDelai > 0 && (
+            <>
+              <dt className="text-ardoise">Majoration délai</dt>
+              <dd className="text-right font-mono">{formatFCFA(totaux.majorationDelai)}</dd>
+            </>
+          )}
+          <dt className="font-bold text-marine">Total</dt>
+          <dd className="text-right font-mono font-bold text-marine">{formatFCFA(totaux.total)}</dd>
+        </dl>
       </div>
 
       <dl className="grid grid-cols-2 gap-y-2 font-body text-sm">
@@ -200,7 +189,7 @@ export default function StepPaiement() {
           {enCours
             ? moyen === "espece"
               ? "Confirmation…"
-              : "Ouverture du paiement…"
+              : "Redirection en cours…"
             : moyen === "espece"
               ? "Confirmer la commande"
               : "Payer maintenant"}

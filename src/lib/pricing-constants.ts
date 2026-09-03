@@ -6,7 +6,8 @@
  * ni les majorations de délai. Isolées ici pour être faciles à ajuster.
  */
 
-export const FRAIS_LIVRAISON_FCFA = 1000;
+// Mis à 0 pour le moment (valeur provisoire, à réactiver/ajuster plus tard).
+export const FRAIS_LIVRAISON_FCFA = 0;
 
 export const MAJORATION_DELAI_TAUX: Record<"standard" | "express" | "premium", number> = {
   standard: 0,

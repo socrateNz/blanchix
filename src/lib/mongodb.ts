@@ -20,7 +20,7 @@ export async function dbConnect(): Promise<typeof mongoose> {
 
   if (!MONGODB_URI) {
     throw new Error(
-      "MONGODB_URI est manquant. Renseigne-le dans .env.local (voir .env.example)."
+      "MONGODB_URI est manquant. Renseigne-le dans .env (voir .env.example)."
     );
   }
 
