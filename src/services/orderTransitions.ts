@@ -24,7 +24,7 @@ type OrderHydrated = mongoose.HydratedDocument<OrderDocument>;
  * persisté tel quel dans order.statut.
  *
  * Un remboursement ici n'enregistre que le changement côté Blanchix : il ne déclenche aucun
- * virement réel via MoneyFusion (non implémenté — à faire manuellement depuis leur tableau de
+ * virement réel via Codees (non implémenté — à faire manuellement depuis leur tableau de
  * bord tant que ce n'est pas automatisé).
  */
 export async function appliquerTransitionCommande(

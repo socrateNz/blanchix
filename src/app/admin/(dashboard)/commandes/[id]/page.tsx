@@ -144,7 +144,7 @@ export default function AdminCommandeDetailPage({ params }: { params: Promise<{ 
               onClick={() => {
                 if (
                   window.confirm(
-                    "Marquer cette commande comme remboursée ? Le virement réel doit être effectué séparément via MoneyFusion."
+                    "Marquer cette commande comme remboursée ? Le virement réel doit être effectué séparément via Codees."
                   )
                 )
                   transition.mutate("rembourser");

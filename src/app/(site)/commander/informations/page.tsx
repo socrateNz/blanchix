@@ -1,16 +1,50 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { useQuery } from "@tanstack/react-query";
 import { useCommande } from "@/context/useCommande";
+import { api } from "@/lib/axios";
 import Field, { inputClasses } from "@/components/ui/Field";
 import Button from "@/components/ui/Button";
+
+interface MesInfos {
+  nom: string;
+  telephone: string;
+  email: string;
+  whatsapp: string;
+}
 
 export default function StepInformations() {
   const { state, dispatch } = useCommande();
   const router = useRouter();
+  const { data: session } = useSession();
   const [form, setForm] = useState(state.client);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // Ne préremplit qu'une fois, pour ne jamais écraser une saisie déjà en cours si le client
+  // revient sur cette étape après l'avoir modifiée.
+  const [preremplissageFait, setPreremplissageFait] = useState(false);
+
+  const { data: mesInfos } = useQuery({
+    queryKey: ["mes-infos"],
+    queryFn: async () => {
+      const { data } = await api.get<MesInfos>("/mes-infos");
+      return data;
+    },
+    enabled: !!session?.user,
+  });
+
+  useEffect(() => {
+    if (!mesInfos || preremplissageFait || form.nom || form.telephone || form.email) return;
+    // setState différé (plutôt qu'appelé directement dans l'effet) — même contrainte que
+    // rencontrée ailleurs cette session avec react-hooks/set-state-in-effect.
+    Promise.resolve().then(() => {
+      setForm({ nom: mesInfos.nom, telephone: mesInfos.telephone, email: mesInfos.email, whatsapp: mesInfos.whatsapp });
+      setPreremplissageFait(true);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mesInfos]);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();

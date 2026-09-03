@@ -6,7 +6,6 @@ import { useCommande } from "@/context/useCommande";
 import { DELAI_LABELS, MAJORATION_DELAI_TAUX, type Delai } from "@/lib/pricing-constants";
 import Field, { inputClasses } from "@/components/ui/Field";
 import Button from "@/components/ui/Button";
-import CreneauPicker from "@/components/commander/CreneauPicker";
 
 const DELAIS = Object.keys(DELAI_LABELS) as Delai[];
 
@@ -21,20 +20,17 @@ export default function StepDelai() {
   }, [state.articles.length, state.articlesPersonnalises.length, router]);
 
   const [delai, setDelai] = useState<Delai | null>(state.delai);
-  const [creneauId, setCreneauId] = useState(state.creneauLivraisonId);
   const [adresseDifferente, setAdresseDifferente] = useState(state.adresseLivraisonDifferente);
   const [adresse, setAdresse] = useState(state.adresseLivraison);
   const [error, setError] = useState("");
 
   function handleContinuer() {
     if (!delai) return setError("Choisissez une formule de délai.");
-    if (!creneauId) return setError("Choisissez un créneau de livraison.");
     if (adresseDifferente && (!adresse.quartier.trim() || !adresse.rue.trim())) {
       return setError("Renseignez l'adresse de livraison.");
     }
 
     dispatch({ type: "SET_DELAI", delai });
-    dispatch({ type: "SET_CRENEAU_LIVRAISON", creneauId });
     dispatch({ type: "SET_ADRESSE_LIVRAISON_DIFFERENTE", value: adresseDifferente });
     dispatch({ type: "SET_ADRESSE_LIVRAISON", adresse: adresseDifferente ? adresse : state.adresseCollecte });
     router.push("/commander/paiement");
@@ -67,13 +63,6 @@ export default function StepDelai() {
             </button>
           );
         })}
-      </div>
-
-      <div>
-        <span className="font-body text-sm font-semibold text-marine">Créneau de livraison</span>
-        <div className="mt-2">
-          <CreneauPicker type="livraison" selectedId={creneauId} onSelect={setCreneauId} />
-        </div>
       </div>
 
       <label className="flex items-center gap-2 font-body text-sm text-encre">

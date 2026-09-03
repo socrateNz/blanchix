@@ -61,7 +61,10 @@ const OrderSchema = new Schema(
     adresseCollecte: { type: AdresseCommandeSchema, required: true },
     adresseLivraison: { type: AdresseCommandeSchema, required: true },
     creneauCollecte: { type: Schema.Types.ObjectId, ref: "DeliverySlot", required: true },
-    creneauLivraison: { type: Schema.Types.ObjectId, ref: "DeliverySlot", required: true },
+    // Plus de créneau de livraison programmé (retiré — seule la collecte reste planifiée par
+    // créneau) : champ laissé optionnel plutôt que supprimé pour ne pas invalider les
+    // commandes existantes qui en portent déjà un.
+    creneauLivraison: { type: Schema.Types.ObjectId, ref: "DeliverySlot", default: null },
     livreurCollecte: { type: Schema.Types.ObjectId, ref: "User", default: null },
     livreurLivraison: { type: Schema.Types.ObjectId, ref: "User", default: null },
 
@@ -79,7 +82,11 @@ const OrderSchema = new Schema(
 
     // confirmation/recuPdfUrl : non peuplés en phase 1 — structure prête pour la phase notifications.
     paiement: {
-      methode: { type: String, enum: ["orange_money", "mtn_momo", "carte", "espece"], default: null },
+      methode: {
+        type: String,
+        enum: ["orange_money", "mtn_momo", "mobile_money", "carte", "espece"],
+        default: null,
+      },
       statut: { type: String, default: null },
       referenceExterne: { type: String, default: null },
       montant: { type: Number, default: null },

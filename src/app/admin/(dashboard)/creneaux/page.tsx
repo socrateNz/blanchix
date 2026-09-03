@@ -21,11 +21,12 @@ interface Creneau {
 interface FormCreneau {
   date: string;
   plageHoraire: string;
-  type: "collecte" | "livraison";
   capaciteMax: string;
 }
 
-const FORM_VIDE: FormCreneau = { date: "", plageHoraire: PLAGES_HORAIRES[0], type: "collecte", capaciteMax: "5" };
+// Plus de créneaux de livraison planifiables — seule la collecte l'est désormais, donc plus
+// besoin d'un sélecteur de type dans le formulaire de création (toujours "collecte").
+const FORM_VIDE: FormCreneau = { date: "", plageHoraire: PLAGES_HORAIRES[0], capaciteMax: "5" };
 
 export default function AdminCreneauxPage() {
   const queryClient = useQueryClient();
@@ -44,7 +45,7 @@ export default function AdminCreneauxPage() {
 
   const creation = useMutation({
     mutationFn: async () => {
-      await api.post("/admin/slots", { ...form, capaciteMax: Number(form.capaciteMax) });
+      await api.post("/admin/slots", { ...form, type: "collecte", capaciteMax: Number(form.capaciteMax) });
     },
     onSuccess: () => {
       setForm(FORM_VIDE);
@@ -102,16 +103,6 @@ export default function AdminCreneauxPage() {
                 {p}
               </option>
             ))}
-          </select>
-        </Field>
-        <Field label="Type">
-          <select
-            className={`${inputClasses} w-32`}
-            value={form.type}
-            onChange={(e) => setForm({ ...form, type: e.target.value as "collecte" | "livraison" })}
-          >
-            <option value="collecte">Collecte</option>
-            <option value="livraison">Livraison</option>
           </select>
         </Field>
         <Field label="Capacité">

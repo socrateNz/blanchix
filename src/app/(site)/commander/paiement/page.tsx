@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
-import { Banknote } from "lucide-react";
+import { Banknote, Smartphone } from "lucide-react";
 import { useCommande } from "@/context/useCommande";
 import { api } from "@/lib/axios";
 import { DELAI_LABELS } from "@/lib/pricing-constants";
@@ -13,9 +13,11 @@ import CartSummary from "@/components/commander/CartSummary";
 import StatutPaiement from "@/components/commander/StatutPaiement";
 import type { OrderResult } from "@/context/commandeReducer";
 
+// Un seul choix "paiement mobile" plutôt que Orange Money/MTN MoMo séparés : avec Codees, ce
+// choix se fait sur leur page de paiement hébergée, jamais transmis à notre API (voir
+// src/lib/codees.ts — CheckoutSessionCreate n'a aucun champ de moyen de paiement).
 const MOYENS_PAIEMENT = [
-  { id: "orange_money", label: "Orange Money", couleur: "#FF7900" },
-  { id: "mtn_momo", label: "MTN Mobile Money", couleur: "#FFCB05" },
+  { id: "mobile_money", label: "Paiement mobile (Orange Money / MTN MoMo)", icon: Smartphone },
   { id: "espece", label: "Espèces à la collecte", icon: Banknote },
 ] as const;
 
@@ -24,13 +26,17 @@ export default function StepPaiement() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!state.delai || !state.creneauLivraisonId) router.replace("/commander/delai");
-  }, [state.delai, state.creneauLivraisonId, router]);
+    if (!state.delai) router.replace("/commander/delai");
+  }, [state.delai, router]);
 
-  const [moyen, setMoyen] = useState<(typeof MOYENS_PAIEMENT)[number]["id"]>("orange_money");
-  // Toujours false au (re)montage — y compris après le retour de MoneyFusion (nouvelle page).
+  const [moyen, setMoyen] = useState<(typeof MOYENS_PAIEMENT)[number]["id"]>("mobile_money");
+  // Toujours false au (re)montage — y compris après le retour de Codees (nouvelle page).
   // Ne passe à true que sur action explicite de l'utilisateur après un échec.
   const [reessayer, setReessayer] = useState(false);
+  // URL de la fenêtre de paiement Codees — conservée pour proposer un lien de secours si la
+  // popup a été bloquée par le navigateur ou fermée par erreur (voir handleConfirmer).
+  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
+  const popupRef = useRef<Window | null>(null);
 
   const orderMutation = useMutation({
     mutationFn: async () => {
@@ -39,7 +45,6 @@ export default function StepPaiement() {
         adresseCollecte: state.adresseCollecte,
         adresseLivraison: state.adresseLivraison,
         creneauCollecteId: state.creneauCollecteId,
-        creneauLivraisonId: state.creneauLivraisonId,
         articles: state.articles.map((a) => ({ catalogItemId: a.catalogItemId, quantite: a.quantite })),
         articlesPersonnalises: state.articlesPersonnalises,
         notesClient: state.notesClient,
@@ -55,6 +60,16 @@ export default function StepPaiement() {
       return data;
     },
   });
+
+  function ouvrirPaiement(url: string) {
+    // Codees interdit l'affichage de sa page de paiement dans une iframe (en-tête
+    // X-Frame-Options: DENY, vérifié directement sur leur réponse) — impossible de l'intégrer
+    // dans un dialogue classique. Une fenêtre popup est le compromis le plus proche : le client
+    // ne quitte pas notre page (qui affiche le suivi de statut juste en dessous), seule une
+    // fenêtre séparée s'ouvre pour le formulaire de paiement lui-même.
+    setCheckoutUrl(url);
+    popupRef.current = window.open(url, "codees-checkout", "width=430,height=760");
+  }
 
   async function handleConfirmer() {
     let orderId = state.orderResult?.id;
@@ -82,19 +97,37 @@ export default function StepPaiement() {
       // l'étape suivante côté serveur — on affiche directement l'écran de confirmation.
       return;
     }
-    // Départ vers la page de paiement hébergée par MoneyFusion — le suivi reprend au retour
-    // via l'état persisté (sessionStorage) plutôt que via les paramètres de l'URL de retour,
-    // dont le format exact ajouté par MoneyFusion n'est pas garanti.
-    window.location.assign(url);
+    ouvrirPaiement(url);
   }
 
   if (state.orderResult && !reessayer) {
     return (
-      <StatutPaiement
-        orderId={state.orderResult.id}
-        onSucces={() => dispatch({ type: "RESET" })}
-        onEchec={() => setReessayer(true)}
-      />
+      <div className="flex flex-col gap-4">
+        {checkoutUrl && (
+          <p className="rounded-xl bg-brume p-3 text-center font-body text-xs text-ardoise">
+            Une fenêtre de paiement s&apos;est ouverte. Si elle ne s&apos;affiche pas,{" "}
+            <button
+              type="button"
+              onClick={() => ouvrirPaiement(checkoutUrl)}
+              className="font-semibold text-bleu hover:underline"
+            >
+              cliquez ici pour l&apos;ouvrir
+            </button>
+            .
+          </p>
+        )}
+        <StatutPaiement
+          orderId={state.orderResult.id}
+          onSucces={() => {
+            popupRef.current?.close();
+            dispatch({ type: "RESET" });
+          }}
+          onEchec={() => {
+            popupRef.current?.close();
+            setReessayer(true);
+          }}
+        />
+      </div>
     );
   }
 
@@ -137,11 +170,7 @@ export default function StepPaiement() {
                 moyen === m.id ? "border-bleu bg-bleu/10 text-marine shadow-sm" : "border-ardoise/15 bg-white text-encre"
               }`}
             >
-              {"couleur" in m ? (
-                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: m.couleur }} />
-              ) : (
-                <m.icon className="h-4 w-4 text-succes" strokeWidth={1.8} />
-              )}
+              <m.icon className="h-4 w-4 text-bleu" strokeWidth={1.8} />
               {m.label}
             </button>
           ))}
@@ -171,7 +200,7 @@ export default function StepPaiement() {
           {enCours
             ? moyen === "espece"
               ? "Confirmation…"
-              : "Redirection en cours…"
+              : "Ouverture du paiement…"
             : moyen === "espece"
               ? "Confirmer la commande"
               : "Payer maintenant"}

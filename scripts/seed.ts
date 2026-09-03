@@ -35,7 +35,7 @@ async function seedCatalog() {
 
 async function seedSlots() {
   const count = await genererCreneauxAVenir();
-  console.log(`Créneaux : ${count} créneaux seedés (${JOURS_A_VENIR} jours × ${PLAGES_HORAIRES.length} plages × 2 types).`);
+  console.log(`Créneaux : ${count} créneaux seedés (${JOURS_A_VENIR} jours × ${PLAGES_HORAIRES.length} plages, collecte uniquement).`);
 }
 
 async function seedAdmin() {

@@ -5,16 +5,13 @@ import { dbConnect } from "@/lib/mongodb";
 import Order from "@/models/Order";
 import Payment from "@/models/Payment";
 import User from "@/models/User";
-import { initiateMoneyFusionPayment } from "@/lib/moneyfusion";
+import { creerCodeesCheckout } from "@/lib/codees";
 import { notifierCommandeConfirmee } from "@/services/notifications";
 
 const bodySchema = z.object({
   orderId: z.string().min(1),
-  moyen: z.enum(["orange_money", "mtn_momo", "espece"]),
+  moyen: z.enum(["mobile_money", "espece"]),
 });
-
-// Fenêtre au-delà de laquelle une tentative "en_attente" n'est plus réutilisée (section 6.4).
-const PAIEMENT_EXPIRATION_MS = 15 * 60 * 1000;
 
 export async function POST(request: NextRequest) {
   const parsed = bodySchema.safeParse(await request.json());
@@ -72,19 +69,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ url: null });
   }
 
-  // Double-clic / double initiation : on réutilise la tentative en cours plutôt que d'en
-  // créer une seconde (section 6.4 — "le backend refuse toute seconde initiation").
-  const tentativeExistante = await Payment.findOne({ order: order._id, statut: "en_attente" }).sort({
-    createdAt: -1,
-  });
-  if (tentativeExistante) {
-    const creeLe = tentativeExistante.get("createdAt") as Date;
-    const dernierLog = tentativeExistante.logsBruts.at(-1) as { url?: string } | undefined;
-    if (Date.now() - creeLe.getTime() < PAIEMENT_EXPIRATION_MS && dernierLog?.url) {
-      return NextResponse.json({ url: dernierLog.url, token: tentativeExistante.referenceExterne });
-    }
-  }
-
+  // Toujours créer une NOUVELLE session Codees plutôt que de réutiliser l'URL d'une tentative
+  // en cours (comme on le faisait pour MoneyFusion, section 6.4) : revisiter une URL de
+  // checkout déjà chargée une première fois (ex. clic "Payer" → retour arrière → reclic) a
+  // provoqué en pratique un "CSRF token missing" côté Codees — probablement un jeton CSRF lié
+  // à ce premier chargement, invalidé après la première tentative et resservi tel quel par le
+  // cache du navigateur sur la même URL. Créer un nouveau checkout à chaque fois élimine ce
+  // risque ; ça ne casse aucune idempotence réelle côté nous, puisque rien n'est jamais débité
+  // tant que le client n'a pas activement validé un paiement sur une session Codees précise.
   const client = await User.findById(order.client);
   if (!client) {
     return NextResponse.json({ error: "Client introuvable pour cette commande." }, { status: 404 });
@@ -102,20 +94,17 @@ export async function POST(request: NextRequest) {
   });
 
   const origin = request.nextUrl.origin;
+  const retourUrl = `${origin}/commander/paiement`;
   let reponse;
   try {
-    reponse = await initiateMoneyFusionPayment({
-      // Le montant vient exclusivement de la commande enregistrée en base (déjà calculée
-      // côté serveur à la création) — jamais d'un montant transmis par le client (section 6.6).
-      totalPrice: order.total,
-      article: order.articles.map((a: { nom: string; prixUnitaire: number; quantite: number }) => ({
-        [a.nom]: a.prixUnitaire * a.quantite,
-      })),
-      personal_Info: [{ orderId: String(order._id), paymentId: String(payment._id) }],
-      numeroSend: client.telephone,
-      nomclient: client.nom,
-      return_url: `${origin}/commander/paiement`,
-      webhook_url: `${origin}/api/payments/webhook`,
+    reponse = await creerCodeesCheckout({
+      amount: String(order.total),
+      currency: "XAF",
+      reference: order.numero,
+      customer_name: client.nom,
+      customer_email: client.email,
+      success_url: retourUrl,
+      cancel_url: retourUrl,
     });
   } catch (err) {
     payment.statut = "echoue";
@@ -127,29 +116,19 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!reponse.statut || !reponse.url) {
-    payment.statut = "echoue";
-    payment.logsBruts.push({ source: "initiation_refusee", reponse, date: new Date() });
-    await payment.save();
-    return NextResponse.json(
-      { error: reponse.message || "Le paiement n'a pas pu être initié." },
-      { status: 502 }
-    );
-  }
-
   payment.statut = "en_attente";
-  payment.referenceExterne = reponse.token;
-  payment.logsBruts.push({ source: "initiation", url: reponse.url, reponse, date: new Date() });
+  payment.referenceExterne = reponse.checkout_id;
+  payment.logsBruts.push({ source: "initiation", url: reponse.checkout_url, reponse, date: new Date() });
   await payment.save();
 
   order.paiement = {
     methode: moyen,
     statut: "en_attente",
-    referenceExterne: reponse.token,
+    referenceExterne: reponse.checkout_id,
     montant: order.total,
     dateMaj: new Date(),
   };
   await order.save();
 
-  return NextResponse.json({ url: reponse.url, token: reponse.token });
+  return NextResponse.json({ url: reponse.checkout_url, token: reponse.checkout_id });
 }

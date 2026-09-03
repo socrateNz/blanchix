@@ -44,7 +44,6 @@ export interface CommandeState {
   articlesPersonnalises: ArticlePersonnaliseDraft[];
   notesClient: string;
   delai: Delai | null;
-  creneauLivraisonId: string | null;
   adresseLivraisonDifferente: boolean;
   adresseLivraison: AdresseDraft;
   orderResult: OrderResult | null;
@@ -58,7 +57,6 @@ export const initialCommandeState: CommandeState = {
   articlesPersonnalises: [],
   notesClient: "",
   delai: null,
-  creneauLivraisonId: null,
   adresseLivraisonDifferente: false,
   adresseLivraison: { quartier: "", rue: "", instructions: "" },
   orderResult: null,
@@ -74,7 +72,6 @@ export type CommandeAction =
   | { type: "REMOVE_ARTICLE_PERSONNALISE"; index: number }
   | { type: "SET_NOTES_CLIENT"; notes: string }
   | { type: "SET_DELAI"; delai: Delai }
-  | { type: "SET_CRENEAU_LIVRAISON"; creneauId: string }
   | { type: "SET_ADRESSE_LIVRAISON_DIFFERENTE"; value: boolean }
   | { type: "SET_ADRESSE_LIVRAISON"; adresse: AdresseDraft }
   | { type: "SET_ORDER_RESULT"; result: OrderResult }
@@ -113,8 +110,6 @@ export function commandeReducer(state: CommandeState, action: CommandeAction): C
       return { ...state, notesClient: action.notes };
     case "SET_DELAI":
       return { ...state, delai: action.delai };
-    case "SET_CRENEAU_LIVRAISON":
-      return { ...state, creneauLivraisonId: action.creneauId };
     case "SET_ADRESSE_LIVRAISON_DIFFERENTE":
       return { ...state, adresseLivraisonDifferente: action.value };
     case "SET_ADRESSE_LIVRAISON":

@@ -43,26 +43,19 @@ export async function POST(request: NextRequest) {
     };
   });
 
-  // 2. Les créneaux doivent exister, correspondre au bon type et avoir de la place.
-  const [creneauCollecte, creneauLivraison] = await Promise.all([
-    DeliverySlot.findOne({ _id: data.creneauCollecteId, type: "collecte" }),
-    DeliverySlot.findOne({ _id: data.creneauLivraisonId, type: "livraison" }),
-  ]);
+  // 2. Le créneau doit exister, correspondre au bon type et avoir de la place. Plus de créneau
+  // de livraison à valider ici — seule la collecte reste planifiée par créneau.
+  const creneauCollecte = await DeliverySlot.findOne({ _id: data.creneauCollecteId, type: "collecte" });
 
-  if (!creneauCollecte || !creneauLivraison) {
-    return NextResponse.json({ error: "Créneau de collecte ou de livraison introuvable." }, { status: 400 });
+  if (!creneauCollecte) {
+    return NextResponse.json({ error: "Créneau de collecte introuvable." }, { status: 400 });
   }
 
-  for (const [label, creneau] of [
-    ["collecte", creneauCollecte] as const,
-    ["livraison", creneauLivraison] as const,
-  ]) {
-    if (creneau.statut === "bloque" || creneau.reserves >= creneau.capaciteMax) {
-      return NextResponse.json(
-        { error: `Le créneau de ${label} sélectionné n'est plus disponible. Merci d'en choisir un autre.` },
-        { status: 409 }
-      );
-    }
+  if (creneauCollecte.statut === "bloque" || creneauCollecte.reserves >= creneauCollecte.capaciteMax) {
+    return NextResponse.json(
+      { error: "Le créneau de collecte sélectionné n'est plus disponible. Merci d'en choisir un autre." },
+      { status: 409 }
+    );
   }
 
   // 3. Compte client — créé automatiquement à la première commande (pas d'auth en phase 1).
@@ -120,22 +113,19 @@ export async function POST(request: NextRequest) {
     adresseCollecte: data.adresseCollecte,
     adresseLivraison: data.adresseLivraison,
     creneauCollecte: creneauCollecte._id,
-    creneauLivraison: creneauLivraison._id,
     delai: data.delai,
     notesClient: data.notesClient,
     ...totaux,
   });
 
-  // 5. Réservation atomique des créneaux, seulement si toujours de la place.
-  for (const creneau of [creneauCollecte, creneauLivraison]) {
-    const maj = await DeliverySlot.findOneAndUpdate(
-      { _id: creneau._id, reserves: { $lt: creneau.capaciteMax } },
-      { $inc: { reserves: 1 } },
-      { new: true }
-    );
-    if (maj && maj.reserves >= maj.capaciteMax) {
-      await DeliverySlot.updateOne({ _id: maj._id }, { $set: { statut: "complet" } });
-    }
+  // 5. Réservation atomique du créneau, seulement si toujours de la place.
+  const creneauMaj = await DeliverySlot.findOneAndUpdate(
+    { _id: creneauCollecte._id, reserves: { $lt: creneauCollecte.capaciteMax } },
+    { $inc: { reserves: 1 } },
+    { new: true }
+  );
+  if (creneauMaj && creneauMaj.reserves >= creneauMaj.capaciteMax) {
+    await DeliverySlot.updateOne({ _id: creneauMaj._id }, { $set: { statut: "complet" } });
   }
 
   return NextResponse.json(

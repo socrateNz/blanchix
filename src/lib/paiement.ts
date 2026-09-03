@@ -1,6 +1,8 @@
 export const MOYEN_PAIEMENT_LABELS: Record<string, string> = {
+  // orange_money/mtn_momo : anciennes valeurs (MoneyFusion), conservées pour l'historique.
   orange_money: "Orange Money",
   mtn_momo: "MTN Mobile Money",
+  mobile_money: "Paiement mobile (Orange Money / MTN MoMo)",
   carte: "Carte bancaire",
   espece: "Espèces",
 };

@@ -18,7 +18,6 @@ export const createOrderSchema = z
     adresseCollecte: adresseSchema,
     adresseLivraison: adresseSchema,
     creneauCollecteId: z.string().min(1),
-    creneauLivraisonId: z.string().min(1),
     articles: z
       .array(
         z.object({

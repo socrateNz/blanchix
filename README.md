@@ -4,9 +4,9 @@ Plateforme web de blanchisserie à domicile (Douala) — Next.js App Router, Mon
 
 ## État du projet — Phase 1
 
-Cette phase couvre : fondation technique, pages publiques (Accueil, Comment ça fonctionne), le tunnel de commande en 5 étapes et le paiement Mobile Money (MoneyFusion — Orange Money / MTN MoMo) avec workflow serveur complet (initiation, webhook, revérification, idempotence — cahier des charges section 6). **L'authentification, le dashboard admin, le suivi de commande, la PWA et les notifications ne sont pas encore implémentés** — prochaines phases.
+Cette phase couvre : fondation technique, pages publiques (Accueil, Comment ça fonctionne), le tunnel de commande en 5 étapes et le paiement Mobile Money (Codees — Orange Money / MTN MoMo) avec workflow serveur complet (initiation, webhook, revérification, idempotence — cahier des charges section 6). **L'authentification, le dashboard admin, le suivi de commande, la PWA et les notifications ne sont pas encore implémentés** — prochaines phases.
 
-Le paiement MoneyFusion est codé mais **non testé en conditions réelles** : `docs.moneyfusion.net` n'était pas joignable pendant le développement, donc les formes de requête/réponse (`src/lib/moneyfusion.ts`) viennent de leurs SDK officiels/communautaires plutôt que de leur documentation lue directement. À revalider avec le vrai tableau de bord MoneyFusion dès que `MONEYFUSION_API_URL` est disponible.
+Le paiement Codees (`src/lib/codees.ts`) est codé contre leur schéma OpenAPI documenté (pay.codees-cm.com/merchant/api-reference/) mais **non testé en conditions réelles** faute d'identifiants — à revalider dès que `CODEES_API_KEY`/`CODEES_SECRET_KEY` sont disponibles.
 
 ## Démarrage
 
@@ -19,7 +19,7 @@ Le paiement MoneyFusion est codé mais **non testé en conditions réelles** : `
 
 - **Tarification** (`src/lib/pricing-constants.ts`) : frais de livraison et majorations par délai sont des valeurs de démarrage, pas des montants validés — le cahier des charges n'en fixe pas.
 - **Logo** : `logo.jpeg`/`charte.jpeg` à la racine sont des références brutes ; le header/footer utilisent pour l'instant un logotype texte, en attendant un export vectoriel propre.
-- **MoneyFusion** : `MONEYFUSION_API_URL` (et éventuellement `MONEYFUSION_WEBHOOK_SECRET`) doivent être renseignés depuis le tableau de bord MoneyFusion avant de pouvoir tester un paiement de bout en bout — voir `.env.example`.
+- **Codees** : `CODEES_API_KEY`/`CODEES_SECRET_KEY` doivent être renseignés depuis le tableau de bord marchand Codees avant de pouvoir tester un paiement de bout en bout — voir `.env.example`.
 
 ## Scripts
 

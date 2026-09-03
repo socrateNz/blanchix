@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import Order, { type OrderDocument } from "@/models/Order";
 import { type PaymentDocument } from "@/models/Payment";
-import { checkMoneyFusionPaymentStatus } from "@/lib/moneyfusion";
+import { verifierCodeesCheckout } from "@/lib/codees";
 import { notifierCommandeConfirmee } from "@/services/notifications";
 
 type PaymentHydrated = mongoose.HydratedDocument<PaymentDocument>;
@@ -9,11 +9,17 @@ type OrderHydrated = mongoose.HydratedDocument<OrderDocument>;
 
 const STATUTS_PAIEMENT_TERMINAUX = ["reussi", "echoue", "expire", "rembourse"];
 
+// Codees fait expirer une session de checkout au bout de 30 minutes (documenté par leur API :
+// "The session expires after 30 minutes.") — on s'aligne exactement dessus plutôt que de
+// garder une estimation arbitraire.
+export const PAIEMENT_EXPIRATION_MS = 30 * 60 * 1000;
+
 /**
- * Revérifie un paiement en cours directement auprès de MoneyFusion (jamais sur la base d'un
- * contenu de webhook non authentifié — cahier des charges section 6.1) et applique la transition
- * de statut de commande correspondante. Idempotent : un paiement déjà dans un statut terminal
- * n'est jamais retraité (section 6.3).
+ * Revérifie un paiement en cours directement auprès de Codees (jamais sur la base d'un contenu
+ * de webhook non authentifié — cahier des charges section 6.1, et Codees ne documente de toute
+ * façon aucun format de webhook vérifiable) et applique la transition de statut de commande
+ * correspondante. Idempotent : un paiement déjà dans un statut terminal n'est jamais retraité
+ * (section 6.3).
  */
 export async function verifierEtAppliquerPaiement(payment: PaymentHydrated): Promise<PaymentHydrated> {
   if (STATUTS_PAIEMENT_TERMINAUX.includes(payment.statut ?? "")) {
@@ -23,14 +29,14 @@ export async function verifierEtAppliquerPaiement(payment: PaymentHydrated): Pro
     return payment;
   }
 
-  const verification = await checkMoneyFusionPaymentStatus(payment.referenceExterne);
+  const verification = await verifierCodeesCheckout(payment.referenceExterne);
   payment.logsBruts.push({ source: "verification", reponse: verification, date: new Date() });
 
   const order = (await Order.findById(payment.order)) as OrderHydrated | null;
-  const statutFournisseur = verification.data?.statut;
+  const statutFournisseur = verification.status;
   const maintenant = new Date();
 
-  if (statutFournisseur === "paid") {
+  if (statutFournisseur === "completed") {
     payment.statut = "reussi";
 
     if (order && (order.statut === "EN_ATTENTE_PAIEMENT" || order.statut === "PAIEMENT_ECHOUE")) {
@@ -57,29 +63,30 @@ export async function verifierEtAppliquerPaiement(payment: PaymentHydrated): Pro
         console.error("Échec de l'envoi de la confirmation de commande :", err);
       }
     }
-  } else if (statutFournisseur === "failed" || statutFournisseur === "no paid") {
-    payment.statut = "echoue";
+  } else if (statutFournisseur === "failed" || statutFournisseur === "cancelled" || statutFournisseur === "expired") {
+    payment.statut = statutFournisseur === "expired" ? "expire" : "echoue";
 
     if (order && order.statut === "EN_ATTENTE_PAIEMENT") {
       order.statut = "PAIEMENT_ECHOUE";
       order.statusHistory.push({ statut: "PAIEMENT_ECHOUE", date: maintenant });
       if (order.paiement) {
-        order.paiement.statut = "echoue";
+        order.paiement.statut = payment.statut;
         order.paiement.dateMaj = maintenant;
       }
       await order.save();
     }
   }
-  // "pending" — rien à appliquer, la commande reste en attente.
+  // "open"/"processing" — rien à appliquer, la commande reste en attente.
 
   await payment.save();
   return payment;
 }
 
 /**
- * Marque un paiement resté sans confirmation trop longtemps comme expiré (section 6.4).
- * Vérification effectuée à la demande (polling du statut) faute d'infrastructure de tâches
- * planifiées en MVP — un vrai job récurrent serait préférable à terme.
+ * Marque un paiement resté sans confirmation trop longtemps comme expiré (section 6.4) — filet
+ * de sécurité si, pour une raison quelconque, Codees lui-même n'était pas encore passé à
+ * "expired" au moment du polling. Vérification effectuée à la demande (polling du statut)
+ * faute d'infrastructure de tâches planifiées en MVP.
  */
 export async function expirerPaiementSiDepasse(
   payment: PaymentHydrated,

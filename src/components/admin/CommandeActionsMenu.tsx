@@ -140,7 +140,7 @@ export default function CommandeActionsMenu({
                   onSelect={() => {
                     if (
                       window.confirm(
-                        "Marquer cette commande comme remboursée ? Le virement réel doit être effectué séparément via MoneyFusion."
+                        "Marquer cette commande comme remboursée ? Le virement réel doit être effectué séparément via Codees."
                       )
                     )
                       mutation.mutate("rembourser");

@@ -21,15 +21,16 @@ export async function genererCreneauxAVenir(): Promise<number> {
     date.setDate(aujourdhui.getDate() + dayOffset);
     date.setHours(0, 0, 0, 0);
 
-    for (const type of ["collecte", "livraison"] as const) {
-      for (const plageHoraire of PLAGES_HORAIRES) {
-        await DeliverySlot.findOneAndUpdate(
-          { date, type, plageHoraire },
-          { $setOnInsert: { capaciteMax: CAPACITE_MAX_DEFAUT, reserves: 0, statut: "ouvert" } },
-          { upsert: true }
-        );
-        count++;
-      }
+    // Plus de créneaux de livraison programmés — seule la collecte reste planifiée par
+    // créneau (voir Order.creneauLivraison, désormais optionnel). "livraison" reste une valeur
+    // valide du schéma DeliverySlot pour ne pas invalider les créneaux déjà existants.
+    for (const plageHoraire of PLAGES_HORAIRES) {
+      await DeliverySlot.findOneAndUpdate(
+        { date, type: "collecte", plageHoraire },
+        { $setOnInsert: { capaciteMax: CAPACITE_MAX_DEFAUT, reserves: 0, statut: "ouvert" } },
+        { upsert: true }
+      );
+      count++;
     }
   }
 

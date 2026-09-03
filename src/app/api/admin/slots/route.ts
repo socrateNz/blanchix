@@ -31,10 +31,13 @@ export async function GET(request: NextRequest) {
   );
 }
 
+// "livraison" retiré ici : plus aucun créneau de livraison n'est planifiable (seule la
+// collecte l'est désormais) — le type reste accepté par le schéma DeliverySlot et par le
+// filtre GET ci-dessus pour ne pas invalider les créneaux de livraison déjà existants.
 const createSchema = z.object({
   date: z.string().min(1),
   plageHoraire: z.string().trim().min(1),
-  type: z.enum(["collecte", "livraison"]),
+  type: z.enum(["collecte"]),
   capaciteMax: z.number().int().min(1),
 });
 
