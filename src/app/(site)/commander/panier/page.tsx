@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCommande } from "@/context/useCommande";
 import { useCatalog } from "@/hooks/useCatalog";
+import { useSettings } from "@/hooks/useSettings";
 import { inputClasses } from "@/components/ui/Field";
 import Button from "@/components/ui/Button";
 import CartSummary from "@/components/commander/CartSummary";
@@ -15,6 +16,7 @@ export default function StepPanier() {
   const { state, dispatch } = useCommande();
   const router = useRouter();
   const { data: catalog, isLoading, isError } = useCatalog();
+  const { data: settings } = useSettings();
 
   useEffect(() => {
     if (!state.creneauCollecteId) router.replace("/commander/adresse");
@@ -35,9 +37,19 @@ export default function StepPanier() {
     });
   }
 
+  const sousTotal = state.articles.reduce((sum, a) => sum + a.prixUnitaire * a.quantite, 0);
+  const commandeMinimale = settings?.commandeMinimale ?? 0;
+  const montantManquant = Math.max(0, commandeMinimale - sousTotal);
+
   function handleContinuer() {
     if (state.articles.length === 0 && state.articlesPersonnalises.length === 0) {
       setError("Ajoutez au moins un article avant de continuer.");
+      return;
+    }
+    if (montantManquant > 0) {
+      setError(
+        `Il manque ${formatFCFA(montantManquant)} pour atteindre le minimum de commande de ${formatFCFA(commandeMinimale)}.`
+      );
       return;
     }
     dispatch({ type: "SET_NOTES_CLIENT", notes });
@@ -138,6 +150,12 @@ export default function StepPanier() {
 
       <div className="rounded-xl bg-brume p-4">
         <CartSummary articles={state.articles} articlesPersonnalises={state.articlesPersonnalises} />
+        {montantManquant > 0 && (
+          <p className="mt-2 font-body text-xs font-semibold text-attente">
+            Il manque {formatFCFA(montantManquant)} pour atteindre le minimum de commande de{" "}
+            {formatFCFA(commandeMinimale)}.
+          </p>
+        )}
       </div>
 
       {error && <p className="font-body text-xs text-alerte">{error}</p>}

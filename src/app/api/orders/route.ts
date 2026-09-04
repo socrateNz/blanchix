@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/mongodb";
 import CatalogItem from "@/models/CatalogItem";
 import DeliverySlot from "@/models/DeliverySlot";
+import DeliveryZone from "@/models/DeliveryZone";
 import Order from "@/models/Order";
 import User from "@/models/User";
 import { createOrderSchema } from "@/schemas/order.schema";
 import { computeOrderTotals, type LigneArticle } from "@/services/pricing";
 import { generateOrderNumber } from "@/services/orderNumber";
 import { notifierBienvenue } from "@/services/notifications";
+import { getSettings } from "@/services/settings";
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -58,6 +60,20 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // 2bis. Les deux zones de livraison (collecte + livraison, potentiellement différentes) —
+  // jamais confiance au nom/prix envoyé par le client, résolus depuis la zone active en base
+  // (même principe que le catalogue à l'étape 1).
+  const [zoneCollecte, zoneLivraison] = await Promise.all([
+    DeliveryZone.findOne({ _id: data.adresseCollecte.zoneId, actif: true }),
+    DeliveryZone.findOne({ _id: data.adresseLivraison.zoneId, actif: true }),
+  ]);
+  if (!zoneCollecte || !zoneLivraison) {
+    return NextResponse.json(
+      { error: "Zone de livraison introuvable ou désactivée. Merci de sélectionner une autre zone." },
+      { status: 400 }
+    );
+  }
+
   // 3. Compte client — créé automatiquement à la première commande (pas d'auth en phase 1).
   const client = await User.findOneAndUpdate(
     { email: data.client.email.toLowerCase() },
@@ -91,7 +107,18 @@ export async function POST(request: NextRequest) {
     prixUnitaire: a.prixUnitaire,
     quantite: a.quantite,
   }));
-  const totaux = computeOrderTotals(lignesTarifees, data.delai);
+  const settings = await getSettings();
+  const totaux = computeOrderTotals(lignesTarifees, data.delai, zoneLivraison.prix, {
+    active: settings.livraisonGratuiteActive,
+    seuil: settings.livraisonGratuiteSeuil,
+  });
+
+  if (totaux.sousTotal < settings.commandeMinimale) {
+    return NextResponse.json(
+      { error: `Montant minimum de commande non atteint (${settings.commandeMinimale} FCFA).` },
+      { status: 400 }
+    );
+  }
 
   const numero = await generateOrderNumber();
   const maintenant = new Date();
@@ -110,8 +137,22 @@ export async function POST(request: NextRequest) {
       quantiteEstimee: a.quantiteEstimee,
       description: a.description,
     })),
-    adresseCollecte: data.adresseCollecte,
-    adresseLivraison: data.adresseLivraison,
+    adresseCollecte: {
+      zone: zoneCollecte._id,
+      zoneNom: zoneCollecte.nom,
+      zonePrix: zoneCollecte.prix,
+      lieuDit: data.adresseCollecte.lieuDit,
+      gps: data.adresseCollecte.gps,
+      instructions: data.adresseCollecte.instructions,
+    },
+    adresseLivraison: {
+      zone: zoneLivraison._id,
+      zoneNom: zoneLivraison.nom,
+      zonePrix: zoneLivraison.prix,
+      lieuDit: data.adresseLivraison.lieuDit,
+      gps: data.adresseLivraison.gps,
+      instructions: data.adresseLivraison.instructions,
+    },
     creneauCollecte: creneauCollecte._id,
     delai: data.delai,
     notesClient: data.notesClient,

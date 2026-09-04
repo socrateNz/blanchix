@@ -10,6 +10,8 @@ import { api } from "@/lib/axios";
 import { formatFCFA } from "@/lib/utils";
 import { DELAI_LABELS } from "@/lib/pricing-constants";
 import { computeOrderTotals } from "@/services/pricing";
+import { useZones } from "@/hooks/useZones";
+import { useSettings } from "@/hooks/useSettings";
 import Button from "@/components/ui/Button";
 import CartSummary from "@/components/commander/CartSummary";
 import StatutPaiement from "@/components/commander/StatutPaiement";
@@ -35,6 +37,11 @@ export default function StepPaiement() {
   // Toujours false au (re)montage — y compris après le retour de Codees (nouvelle page).
   // Ne passe à true que sur action explicite de l'utilisateur après un échec.
   const [reessayer, setReessayer] = useState(false);
+
+  // Doivent être appelés avant le "return" anticipé ci-dessous (StatutPaiement) — les Hooks ne
+  // peuvent pas être conditionnels.
+  const { data: zones } = useZones();
+  const { data: settings } = useSettings();
 
   const orderMutation = useMutation({
     mutationFn: async () => {
@@ -104,12 +111,18 @@ export default function StepPaiement() {
     );
   }
 
+  const zoneCollecte = zones?.find((z) => z.id === state.adresseCollecte.zoneId);
+  const zoneLivraison = zones?.find((z) => z.id === state.adresseLivraison.zoneId);
+
   const erreur = orderMutation.error ?? paymentMutation.error;
   const enCours = orderMutation.isPending || paymentMutation.isPending;
   // Même formule que le serveur (src/services/pricing.ts, source unique de vérité) — simple
   // aperçu avant validation, le montant réellement facturé est toujours recalculé côté serveur
   // à la création de la commande (section 6.6), jamais pris tel quel depuis ce calcul client.
-  const totaux = computeOrderTotals(state.articles, state.delai ?? "standard");
+  const totaux = computeOrderTotals(state.articles, state.delai ?? "standard", zoneLivraison?.prix ?? 0, {
+    active: settings?.livraisonGratuiteActive ?? false,
+    seuil: settings?.livraisonGratuiteSeuil ?? 0,
+  });
 
   return (
     <div className="flex flex-col gap-6">
@@ -139,11 +152,11 @@ export default function StepPaiement() {
         <dd className="text-right text-encre">{state.delai ? DELAI_LABELS[state.delai].label : "—"}</dd>
         <dt className="text-ardoise">Collecte</dt>
         <dd className="text-right text-encre">
-          {state.adresseCollecte.quartier}, {state.adresseCollecte.rue}
+          {zoneCollecte?.nom ?? "…"}, {state.adresseCollecte.lieuDit}
         </dd>
         <dt className="text-ardoise">Livraison</dt>
         <dd className="text-right text-encre">
-          {state.adresseLivraison.quartier}, {state.adresseLivraison.rue}
+          {zoneLivraison?.nom ?? "…"}, {state.adresseLivraison.lieuDit}
         </dd>
       </dl>
 

@@ -1,4 +1,5 @@
 import { formatFCFA } from "@/lib/utils";
+import { formatZoneAdresse } from "@/lib/adresse";
 import type { OrderStatus } from "@/lib/orderStatuses";
 import type { ReceiptOrder } from "@/services/receipt";
 
@@ -108,11 +109,18 @@ const MESSAGES_STATUT: Partial<Record<OrderStatus, { sujet: string; corps: strin
   },
 };
 
+interface AdresseAffichage {
+  zoneNom?: string | null;
+  lieuDit?: string | null;
+  quartier?: string | null;
+  rue?: string | null;
+}
+
 export function buildEmailAssignationLivreur(
   order: {
     numero: string;
-    adresseCollecte: { quartier: string; rue: string };
-    adresseLivraison: { quartier: string; rue: string };
+    adresseCollecte: AdresseAffichage;
+    adresseLivraison: AdresseAffichage;
   },
   livreur: { prenom?: string | null; nom: string },
   type: "collecte" | "livraison"
@@ -126,7 +134,7 @@ export function buildEmailAssignationLivreur(
       La commande <strong>${order.numero}</strong> vous est assignée pour la ${type === "collecte" ? "collecte" : "livraison"}.
     </p>
     <p style="margin:0;font-size:14px;color:#333333;line-height:1.6;">
-      Adresse : ${adresse.quartier}, ${adresse.rue}
+      Adresse : ${formatZoneAdresse(adresse)}
     </p>`;
   return { subject: `Commande ${order.numero} à ${verbe}`, html: wrapperEmail(contenu) };
 }

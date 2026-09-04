@@ -7,6 +7,7 @@ import { isAxiosError } from "axios";
 import { ArrowLeft, Download } from "lucide-react";
 import { api } from "@/lib/axios";
 import { formatFCFA } from "@/lib/utils";
+import { formatZoneAdresse } from "@/lib/adresse";
 import { STATUT_LABELS, type OrderStatus } from "@/lib/orderStatuses";
 import { DELAI_LABELS, type Delai } from "@/lib/pricing-constants";
 import Container from "@/components/ui/Container";
@@ -14,14 +15,21 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import StatutBadge from "@/components/admin/StatutBadge";
 
+interface AdresseAffichage {
+  zoneNom?: string;
+  lieuDit?: string;
+  quartier?: string;
+  rue?: string;
+}
+
 interface CommandeDetail {
   id: string;
   numero: string;
   statut: OrderStatus;
   articles: { nom: string; prixUnitaire: number; quantite: number }[];
   articlesPersonnalises: { nom: string; quantiteEstimee: number; statut: string; prixPropose: number | null }[];
-  adresseCollecte: { quartier: string; rue: string };
-  adresseLivraison: { quartier: string; rue: string };
+  adresseCollecte: AdresseAffichage;
+  adresseLivraison: AdresseAffichage;
   creneauCollecte: { date: string; plageHoraire: string } | null;
   creneauLivraison: { date: string; plageHoraire: string } | null;
   delai: Delai;
@@ -184,7 +192,7 @@ export default function SuiviDetailPage({ params }: { params: Promise<{ id: stri
                 <dd className="text-right text-encre">{DELAI_LABELS[data.delai]?.label ?? data.delai}</dd>
                 <dt className="text-ardoise">Collecte</dt>
                 <dd className="text-right text-encre">
-                  {data.adresseCollecte.quartier}, {data.adresseCollecte.rue}
+                  {formatZoneAdresse(data.adresseCollecte)}
                   {data.creneauCollecte && (
                     <div className="text-xs text-ardoise">
                       {new Date(data.creneauCollecte.date).toLocaleDateString("fr-FR")} ·{" "}
@@ -194,7 +202,7 @@ export default function SuiviDetailPage({ params }: { params: Promise<{ id: stri
                 </dd>
                 <dt className="text-ardoise">Livraison</dt>
                 <dd className="text-right text-encre">
-                  {data.adresseLivraison.quartier}, {data.adresseLivraison.rue}
+                  {formatZoneAdresse(data.adresseLivraison)}
                   {data.creneauLivraison && (
                     <div className="text-xs text-ardoise">
                       {new Date(data.creneauLivraison.date).toLocaleDateString("fr-FR")} ·{" "}

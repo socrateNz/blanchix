@@ -7,6 +7,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { MapPin, Check } from "lucide-react";
 import { api } from "@/lib/axios";
 import { useCommande } from "@/context/useCommande";
+import { useZones } from "@/hooks/useZones";
+import { formatZoneAdresse } from "@/lib/adresse";
+import { formatFCFA } from "@/lib/utils";
 import Field, { inputClasses } from "@/components/ui/Field";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
@@ -15,8 +18,12 @@ import CreneauPicker from "@/components/commander/CreneauPicker";
 interface AdresseEnregistree {
   id: string;
   label?: string;
-  quartier: string;
-  rue: string;
+  zoneId?: string;
+  zoneNom?: string;
+  lieuDit?: string;
+  // quartier/rue : résidences enregistrées avant l'introduction des zones de livraison.
+  quartier?: string;
+  rue?: string;
   instructions?: string;
   parDefaut?: boolean;
 }
@@ -43,6 +50,8 @@ export default function StepAdresse() {
   const residence = adresses?.find((a) => a.parDefaut) ?? adresses?.[0] ?? null;
   const verificationEnCours = statutSession === "loading" || (!!session?.user && chargementAdresses);
 
+  const { data: zones, isLoading: chargementZones } = useZones();
+
   const [saisieManuelle, setSaisieManuelle] = useState(false);
   const [residenceSelectionnee, setResidenceSelectionnee] = useState(false);
   const [adresse, setAdresse] = useState(state.adresseCollecte);
@@ -59,15 +68,25 @@ export default function StepAdresse() {
 
   function utiliserResidence() {
     if (!residence) return;
-    setAdresse({ quartier: residence.quartier, rue: residence.rue, instructions: residence.instructions ?? "" });
-    setSaisieManuelle(false);
-    setResidenceSelectionnee(true);
+    setAdresse({
+      zoneId: residence.zoneId ?? "",
+      lieuDit: residence.lieuDit ?? "",
+      instructions: residence.instructions ?? "",
+    });
+    if (residence.zoneId) {
+      setSaisieManuelle(false);
+      setResidenceSelectionnee(true);
+    } else {
+      // Résidence enregistrée avant l'introduction des zones : pas de zone à réutiliser, on
+      // affiche le formulaire (pré-rempli en lieu-dit/instructions) pour qu'elle en choisisse une.
+      setSaisieManuelle(true);
+    }
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!adresse.quartier.trim() || !adresse.rue.trim()) {
-      setError("Le quartier et la rue sont requis.");
+    if (!adresse.zoneId || !adresse.lieuDit.trim()) {
+      setError("La zone et le lieu-dit sont requis.");
       return;
     }
     if (!creneauId) {
@@ -111,9 +130,7 @@ export default function StepAdresse() {
             </span>
             <div className="flex-1">
               <p className="font-body text-sm font-semibold text-marine">{residence.label || "Votre résidence"}</p>
-              <p className="font-body text-sm text-encre">
-                {residence.quartier}, {residence.rue}
-              </p>
+              <p className="font-body text-sm text-encre">{formatZoneAdresse(residence)}</p>
             </div>
           </div>
           {residenceSelectionnee ? (
@@ -152,21 +169,28 @@ export default function StepAdresse() {
             </button>
           )}
 
-          <Field label="Quartier">
-            <input
+          <Field label="Zone de livraison">
+            <select
               className={inputClasses}
-              value={adresse.quartier}
-              onChange={(e) => setAdresse({ ...adresse, quartier: e.target.value })}
-              placeholder="Ex. Bonapriso"
-            />
+              value={adresse.zoneId}
+              onChange={(e) => setAdresse({ ...adresse, zoneId: e.target.value })}
+              disabled={chargementZones}
+            >
+              <option value="">{chargementZones ? "Chargement…" : "Sélectionnez une zone"}</option>
+              {zones?.map((z) => (
+                <option key={z.id} value={z.id}>
+                  {z.nom} — {formatFCFA(z.prix)}
+                </option>
+              ))}
+            </select>
           </Field>
 
-          <Field label="Rue">
+          <Field label="Lieu-dit">
             <input
               className={inputClasses}
-              value={adresse.rue}
-              onChange={(e) => setAdresse({ ...adresse, rue: e.target.value })}
-              placeholder="Ex. Rue Njo-Njo, non loin de..."
+              value={adresse.lieuDit}
+              onChange={(e) => setAdresse({ ...adresse, lieuDit: e.target.value })}
+              placeholder="Ex. Non loin du carrefour, portail bleu"
             />
           </Field>
 

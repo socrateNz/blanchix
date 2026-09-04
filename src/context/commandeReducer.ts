@@ -14,8 +14,8 @@ export interface ArticlePersonnaliseDraft {
 }
 
 export interface AdresseDraft {
-  quartier: string;
-  rue: string;
+  zoneId: string;
+  lieuDit: string;
   instructions?: string;
 }
 
@@ -51,14 +51,14 @@ export interface CommandeState {
 
 export const initialCommandeState: CommandeState = {
   client: { nom: "", telephone: "", email: "", whatsapp: "" },
-  adresseCollecte: { quartier: "", rue: "", instructions: "" },
+  adresseCollecte: { zoneId: "", lieuDit: "", instructions: "" },
   creneauCollecteId: null,
   articles: [],
   articlesPersonnalises: [],
   notesClient: "",
   delai: null,
   adresseLivraisonDifferente: false,
-  adresseLivraison: { quartier: "", rue: "", instructions: "" },
+  adresseLivraison: { zoneId: "", lieuDit: "", instructions: "" },
   orderResult: null,
 };
 

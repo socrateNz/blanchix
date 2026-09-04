@@ -9,6 +9,10 @@ export const USER_ROLES = ["client", "admin", "operateur", "livreur", "super_adm
 // id pour être supprimée/mise à jour, sans clé naturelle fiable comme l'endpoint d'un push.
 const AdresseUserSchema = new Schema({
   label: { type: String, trim: true },
+  zone: { type: Schema.Types.ObjectId, ref: "DeliveryZone" },
+  zoneNom: { type: String, trim: true },
+  lieuDit: { type: String, trim: true },
+  // quartier/rue : legacy, résidences enregistrées avant l'introduction des zones de livraison.
   quartier: { type: String, trim: true },
   rue: { type: String, trim: true },
   gps: {

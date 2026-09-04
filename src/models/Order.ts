@@ -36,8 +36,17 @@ const ArticlePersonnaliseSchema = new Schema({
 
 const AdresseCommandeSchema = new Schema(
   {
-    quartier: { type: String, required: true, trim: true },
-    rue: { type: String, required: true, trim: true },
+    zone: { type: Schema.Types.ObjectId, ref: "DeliveryZone", required: true },
+    // Dénormalisés au moment de la commande (même principe que ArticleCommandeSchema.nom/
+    // prixUnitaire) : une commande garde le nom/prix de zone qu'elle avait à sa création, même
+    // si la zone est renommée/reprix par la suite.
+    zoneNom: { type: String, required: true, trim: true },
+    zonePrix: { type: Number, required: true },
+    lieuDit: { type: String, required: true, trim: true },
+    // quartier/rue : legacy, conservés uniquement pour l'affichage des commandes créées avant
+    // l'introduction des zones de livraison — plus jamais écrits par le code actuel.
+    quartier: { type: String, trim: true },
+    rue: { type: String, trim: true },
     gps: {
       lat: Number,
       lng: Number,

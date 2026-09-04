@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCommande } from "@/context/useCommande";
 import { DELAI_LABELS, MAJORATION_DELAI_TAUX, type Delai } from "@/lib/pricing-constants";
+import { useZones } from "@/hooks/useZones";
+import { formatFCFA } from "@/lib/utils";
 import Field, { inputClasses } from "@/components/ui/Field";
 import Button from "@/components/ui/Button";
 
@@ -19,6 +21,8 @@ export default function StepDelai() {
     }
   }, [state.articles.length, state.articlesPersonnalises.length, router]);
 
+  const { data: zones, isLoading: chargementZones } = useZones();
+
   const [delai, setDelai] = useState<Delai | null>(state.delai);
   const [adresseDifferente, setAdresseDifferente] = useState(state.adresseLivraisonDifferente);
   const [adresse, setAdresse] = useState(state.adresseLivraison);
@@ -26,7 +30,7 @@ export default function StepDelai() {
 
   function handleContinuer() {
     if (!delai) return setError("Choisissez une formule de délai.");
-    if (adresseDifferente && (!adresse.quartier.trim() || !adresse.rue.trim())) {
+    if (adresseDifferente && (!adresse.zoneId || !adresse.lieuDit.trim())) {
       return setError("Renseignez l'adresse de livraison.");
     }
 
@@ -77,18 +81,26 @@ export default function StepDelai() {
 
       {adresseDifferente && (
         <div className="flex flex-col gap-4 rounded-xl bg-brume p-4">
-          <Field label="Quartier">
-            <input
+          <Field label="Zone de livraison">
+            <select
               className={inputClasses}
-              value={adresse.quartier}
-              onChange={(e) => setAdresse({ ...adresse, quartier: e.target.value })}
-            />
+              value={adresse.zoneId}
+              onChange={(e) => setAdresse({ ...adresse, zoneId: e.target.value })}
+              disabled={chargementZones}
+            >
+              <option value="">{chargementZones ? "Chargement…" : "Sélectionnez une zone"}</option>
+              {zones?.map((z) => (
+                <option key={z.id} value={z.id}>
+                  {z.nom} — {formatFCFA(z.prix)}
+                </option>
+              ))}
+            </select>
           </Field>
-          <Field label="Rue">
+          <Field label="Lieu-dit">
             <input
               className={inputClasses}
-              value={adresse.rue}
-              onChange={(e) => setAdresse({ ...adresse, rue: e.target.value })}
+              value={adresse.lieuDit}
+              onChange={(e) => setAdresse({ ...adresse, lieuDit: e.target.value })}
             />
           </Field>
           <Field label="Instructions de livraison" optional>

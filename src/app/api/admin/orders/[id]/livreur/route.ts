@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/apiAuth";
 import { logAudit } from "@/services/audit";
 import { notifierAssignationLivreur } from "@/services/notifications";
 import { construireLienWhatsapp } from "@/lib/whatsapp";
+import { formatZoneAdresse } from "@/lib/adresse";
 import Order from "@/models/Order";
 import User from "@/models/User";
 // Cf. src/app/api/mes-commandes/[id]/route.ts : nécessaire pour le .populate("creneau...")
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     creneau && "date" in creneau
       ? ` Créneau : ${new Date(creneau.date).toLocaleDateString("fr-FR")} ${creneau.plageHoraire}.`
       : "";
-  const message = `Bonjour ${livreur.prenom ?? ""} ${livreur.nom}, la commande ${order.numero} vous est assignée pour la ${type === "collecte" ? "collecte" : "livraison"}. Adresse : ${adresse.quartier}, ${adresse.rue}.${creneauTexte}`;
+  const message = `Bonjour ${livreur.prenom ?? ""} ${livreur.nom}, la commande ${order.numero} vous est assignée pour la ${type === "collecte" ? "collecte" : "livraison"}. Adresse : ${formatZoneAdresse(adresse)}.${creneauTexte}`;
 
   return NextResponse.json({
     ok: true,

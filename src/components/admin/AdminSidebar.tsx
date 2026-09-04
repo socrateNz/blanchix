@@ -2,7 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ClipboardList, ShoppingBasket, CalendarClock, ScrollText, Truck } from "lucide-react";
+import {
+  LayoutDashboard,
+  ClipboardList,
+  ShoppingBasket,
+  CalendarClock,
+  ScrollText,
+  Truck,
+  MapPin,
+  Settings,
+} from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -22,7 +31,9 @@ const LIENS = [
   { href: "/admin/catalogue", label: "Catalogue", icon: ShoppingBasket },
   { href: "/admin/creneaux", label: "Créneaux", icon: CalendarClock },
   { href: "/admin/livreurs", label: "Livreurs", icon: Truck },
+  { href: "/admin/zones", label: "Zones de livraison", icon: MapPin },
   { href: "/admin/audit", label: "Audit", icon: ScrollText },
+  { href: "/admin/reglages", label: "Réglages", icon: Settings },
 ] as const;
 
 export default function AdminSidebar() {

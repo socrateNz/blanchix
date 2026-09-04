@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 const adresseSchema = z.object({
-  quartier: z.string().trim().min(1, "Le quartier est requis."),
-  rue: z.string().trim().min(1, "La rue est requise."),
+  zoneId: z.string().min(1, "La zone de livraison est requise."),
+  lieuDit: z.string().trim().min(1, "Le lieu-dit est requis."),
   gps: z.object({ lat: z.number(), lng: z.number() }).optional(),
   instructions: z.string().trim().max(500).optional(),
 });
