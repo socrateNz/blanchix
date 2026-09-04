@@ -41,7 +41,13 @@ export function deriveStatutPaiementAffiche(order: {
 }): StatutPaiementAffiche {
   if (order.paiement?.statut === "rembourse") return "REMBOURSE";
   if (order.paiement?.statut === "a_percevoir") return "EN_ATTENTE";
-  if (order.statut === "PAIEMENT_ECHOUE") return "ECHOUE";
-  if (order.statut === "BROUILLON" || order.statut === "EN_ATTENTE_PAIEMENT") return "EN_ATTENTE";
-  return "PAYE";
+  // Vérifie explicitement "reussi" plutôt que d'y défaut par élimination : une commande
+  // ANNULEE/INCIDENT/COLLECTE_ECHOUEE alors qu'elle était encore EN_ATTENTE_PAIEMENT (jamais
+  // payée) ne matchait aucun des cas ci-dessous et retombait sur un `return "PAYE"` par défaut
+  // — bug réel observé en prod : annuler une commande jamais payée l'affichait comme "Payée".
+  if (order.paiement?.statut === "reussi") return "PAYE";
+  if (order.statut === "PAIEMENT_ECHOUE" || order.paiement?.statut === "echoue" || order.paiement?.statut === "expire") {
+    return "ECHOUE";
+  }
+  return "EN_ATTENTE";
 }

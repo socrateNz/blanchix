@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MoreHorizontal, ArrowRight, Banknote, Ban, Undo2, Truck, PackageCheck } from "lucide-react";
+import { MoreHorizontal, ArrowRight, Banknote, Ban, Undo2, Truck, PackageCheck, CreditCard } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import { api } from "@/lib/axios";
@@ -23,7 +23,7 @@ import {
 } from "@/lib/orderStatuses";
 import AssignerLivreurDialog from "@/components/admin/AssignerLivreurDialog";
 
-type Action = "etape_suivante" | "annuler" | "rembourser" | "marquer_paye";
+type Action = "etape_suivante" | "annuler" | "rembourser" | "marquer_paye" | "confirmer_paiement_manuel";
 
 /**
  * Regroupe toutes les actions possibles sur une commande (avancement, paiement, annulation,
@@ -73,7 +73,11 @@ export default function CommandeActionsMenu({
   const peutAnnuler = STATUTS_ANNULABLES.includes(statut);
   const peutRembourser = STATUTS_REMBOURSABLES.includes(statut);
   const peutMarquerPaye = paiement?.methode === "espece" && paiement?.statut === "a_percevoir";
-  const aucuneAction = !prochaineEtape && !peutMarquerPaye && !peutAnnuler && !peutRembourser;
+  // Paiement en ligne (mobile_money) resté en attente — bascule administrative directe, sans
+  // repasser par Codees (voir la page détail pour une vraie revérification auprès du
+  // prestataire, via l'action "verifier_paiement").
+  const peutConfirmerPaiementManuel = statut === "EN_ATTENTE_PAIEMENT";
+  const aucuneAction = !prochaineEtape && !peutMarquerPaye && !peutConfirmerPaiementManuel && !peutAnnuler && !peutRembourser;
 
   return (
     <>
@@ -104,6 +108,22 @@ export default function CommandeActionsMenu({
                 >
                   <Banknote />
                   Marquer payé
+                </DropdownMenuItem>
+              )}
+              {peutConfirmerPaiementManuel && (
+                <DropdownMenuItem
+                  disabled={mutation.isPending}
+                  onSelect={() => {
+                    if (
+                      window.confirm(
+                        "Confirmer ce paiement en ligne sans revérifier auprès de Codees ? À utiliser seulement si vous avez une confirmation par un autre moyen."
+                      )
+                    )
+                      mutation.mutate("confirmer_paiement_manuel");
+                  }}
+                >
+                  <CreditCard />
+                  Payer
                 </DropdownMenuItem>
               )}
             </>

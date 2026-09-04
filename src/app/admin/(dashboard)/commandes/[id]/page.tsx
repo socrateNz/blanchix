@@ -75,6 +75,22 @@ export default function AdminCommandeDetailPage({ params }: { params: Promise<{ 
     },
   });
 
+  // Revérifie réellement le statut auprès de Codees (contrairement au "Payer" du tableau des
+  // commandes, une simple bascule administrative) — c'est la variante "par l'api de paiement"
+  // demandée pour cette page de détail.
+  const verifierPaiement = useMutation({
+    mutationFn: async () => {
+      const { data } = await api.patch<{ statut: OrderStatus; statutPaiement: string }>(`/admin/orders/${id}`, {
+        action: "verifier_paiement",
+      });
+      return data;
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-commande", id] });
+      window.alert(`Statut du paiement chez Codees : ${STATUT_PAIEMENT_LABELS[result.statutPaiement] ?? result.statutPaiement}`);
+    },
+  });
+
   if (isLoading) return <p className="font-body text-sm text-ardoise">Chargement…</p>;
   if (isError || !data) return <p className="font-body text-sm text-alerte">Commande introuvable.</p>;
 
@@ -82,6 +98,7 @@ export default function AdminCommandeDetailPage({ params }: { params: Promise<{ 
   const peutAnnuler = STATUTS_ANNULABLES.includes(data.statut);
   const peutRembourser = STATUTS_REMBOURSABLES.includes(data.statut);
   const peutMarquerPaye = data.paiement?.methode === "espece" && data.paiement?.statut === "a_percevoir";
+  const peutVerifierPaiement = data.statut === "EN_ATTENTE_PAIEMENT";
 
   return (
     <div className="flex flex-col gap-6">
@@ -122,6 +139,16 @@ export default function AdminCommandeDetailPage({ params }: { params: Promise<{ 
               }}
             >
               Marquer payé
+            </Button>
+          )}
+          {peutVerifierPaiement && (
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={verifierPaiement.isPending}
+              onClick={() => verifierPaiement.mutate()}
+            >
+              Vérifier le paiement
             </Button>
           )}
           {peutAnnuler && (
@@ -168,6 +195,13 @@ export default function AdminCommandeDetailPage({ params }: { params: Promise<{ 
             {isAxiosError(transition.error) && transition.error.response?.data?.error
               ? String(transition.error.response.data.error)
               : "Action impossible."}
+          </p>
+        )}
+        {verifierPaiement.isError && (
+          <p className="mt-2 font-body text-sm text-alerte">
+            {isAxiosError(verifierPaiement.error) && verifierPaiement.error.response?.data?.error
+              ? String(verifierPaiement.error.response.data.error)
+              : "Vérification impossible."}
           </p>
         )}
       </div>

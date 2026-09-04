@@ -2,7 +2,8 @@
 
 import { use } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { isAxiosError } from "axios";
 import { ArrowLeft, Download } from "lucide-react";
 import { api } from "@/lib/axios";
 import { formatFCFA } from "@/lib/utils";
@@ -10,6 +11,7 @@ import { STATUT_LABELS, type OrderStatus } from "@/lib/orderStatuses";
 import { DELAI_LABELS, type Delai } from "@/lib/pricing-constants";
 import Container from "@/components/ui/Container";
 import Card from "@/components/ui/Card";
+import Button from "@/components/ui/Button";
 import StatutBadge from "@/components/admin/StatutBadge";
 
 interface CommandeDetail {
@@ -41,6 +43,23 @@ export default function SuiviDetailPage({ params }: { params: Promise<{ id: stri
     queryFn: async () => {
       const { data } = await api.get<CommandeDetail>(`/mes-commandes/${id}`);
       return data;
+    },
+  });
+
+  // Réutilise /api/payments/initiate tel quel (déjà responsable de la transition
+  // PAIEMENT_ECHOUE → EN_ATTENTE_PAIEMENT et de la création d'une NOUVELLE session Codees —
+  // jamais une réutilisation d'URL, cause du bug CSRF déjà corrigé) plutôt que de dupliquer
+  // cette logique : c'est exactement le même appel que le tunnel de commande initial.
+  const relancerPaiement = useMutation({
+    mutationFn: async () => {
+      const { data: reponse } = await api.post<{ url: string | null }>("/payments/initiate", {
+        orderId: id,
+        moyen: "mobile_money",
+      });
+      return reponse;
+    },
+    onSuccess: (reponse) => {
+      if (reponse.url) window.location.assign(reponse.url);
     },
   });
 
@@ -80,6 +99,29 @@ export default function SuiviDetailPage({ params }: { params: Promise<{ id: stri
                 >
                   <Download className="h-4 w-4" /> Télécharger le reçu
                 </a>
+              )}
+
+              {data.statut === "PAIEMENT_ECHOUE" && (
+                <div className="mt-4">
+                  <p className="font-body text-sm text-ardoise">
+                    Le paiement n&apos;a pas abouti. Vous pouvez relancer le paiement pour finaliser votre commande.
+                  </p>
+                  <Button
+                    type="button"
+                    className="mt-2"
+                    disabled={relancerPaiement.isPending}
+                    onClick={() => relancerPaiement.mutate()}
+                  >
+                    {relancerPaiement.isPending ? "Redirection…" : "Relancer le paiement"}
+                  </Button>
+                  {relancerPaiement.isError && (
+                    <p className="mt-2 font-body text-sm text-alerte">
+                      {isAxiosError(relancerPaiement.error) && relancerPaiement.error.response?.data?.error
+                        ? String(relancerPaiement.error.response.data.error)
+                        : "Impossible de relancer le paiement. Merci de réessayer."}
+                    </p>
+                  )}
+                </div>
               )}
             </Card>
 

@@ -9,7 +9,7 @@ import {
 
 export class TransitionInvalideError extends Error {}
 
-export type ActionCommande = "etape_suivante" | "annuler" | "rembourser" | "marquer_paye";
+export type ActionCommande = "etape_suivante" | "annuler" | "rembourser" | "marquer_paye" | "confirmer_paiement_manuel";
 
 type OrderHydrated = mongoose.HydratedDocument<OrderDocument>;
 
@@ -78,13 +78,38 @@ export async function appliquerTransitionCommande(
     return "REMBOURSEE";
   }
 
-  // marquer_paye — cash "à percevoir" uniquement : le paiement en ligne suit son propre flux
-  // automatique (src/services/payment.ts), inutile de pouvoir le forcer manuellement ici.
-  if (order.paiement?.methode !== "espece" || order.paiement.statut !== "a_percevoir") {
-    throw new TransitionInvalideError("Cette commande n'a pas de paiement en espèces en attente de perception.");
+  if (action === "marquer_paye") {
+    // Cash "à percevoir" uniquement : le paiement en ligne suit son propre flux automatique
+    // (src/services/payment.ts), inutile de pouvoir le forcer manuellement ici — voir
+    // "confirmer_paiement_manuel" ci-dessous pour l'équivalent côté paiement en ligne.
+    if (order.paiement?.methode !== "espece" || order.paiement.statut !== "a_percevoir") {
+      throw new TransitionInvalideError("Cette commande n'a pas de paiement en espèces en attente de perception.");
+    }
+    order.paiement.statut = "reussi";
+    order.paiement.dateMaj = new Date();
+    await order.save();
+    return statutActuel;
   }
-  order.paiement.statut = "reussi";
-  order.paiement.dateMaj = new Date();
+
+  // confirmer_paiement_manuel — bascule administrative directe pour une commande EN_ATTENTE_
+  // PAIEMENT (paiement en ligne Codees), sans revérifier auprès du prestataire : utile si
+  // l'admin a une confirmation par un autre canal, ou pour débloquer une commande dont le
+  // webhook/la vérification automatique n'a pas abouti. Pour une vérification réelle auprès de
+  // Codees plutôt qu'une simple bascule, voir l'action "verifier_paiement" (route API dédiée,
+  // hors de cette fonction puisqu'elle appelle un service externe).
+  if (statutActuel !== "EN_ATTENTE_PAIEMENT") {
+    throw new TransitionInvalideError("Cette commande n'est pas en attente de paiement.");
+  }
+  const maintenant = new Date();
+  order.statut = "COLLECTE_PLANIFIEE";
+  order.statusHistory.push(
+    { statut: "PAYEE", date: maintenant, user: new mongoose.Types.ObjectId(userId), commentaire },
+    { statut: "COLLECTE_PLANIFIEE", date: maintenant }
+  );
+  if (order.paiement) {
+    order.paiement.statut = "reussi";
+    order.paiement.dateMaj = maintenant;
+  }
   await order.save();
-  return statutActuel;
+  return "COLLECTE_PLANIFIEE";
 }
