@@ -17,6 +17,15 @@ s'exécutent **sur le VPS**, en SSH, depuis la racine du dépôt cloné.
   lui-même sur le VPS : changer `DOMAIN`/`NEXTAUTH_URL` dans `.env` pour `blanchix.cm`, repointer
   son enregistrement DNS A vers le VPS (retire l'accès Vercel à ce moment précis), puis refaire
   les étapes 2-4 (nouveau certificat) pour ce domaine.
+- **Cas rencontré en pratique (VPS partagé avec un autre projet)** : si `sudo ss -tlnp | grep
+  ':80\|:443'` montre un Nginx déjà installé directement sur le serveur (hors Docker), ne PAS
+  laisser les services Docker `nginx`/`certbot` se battre pour les ports 80/443 — ce projet
+  n'utilise alors PAS ces deux services. À la place : `app` publie son port uniquement en local
+  (`127.0.0.1:3010:3000`, déjà dans `docker-compose.yml`), et c'est le Nginx déjà installé qui
+  fait le reverse proxy via `nginx/host/vps.blanchix.cm.conf` (voir le commentaire en tête de ce
+  fichier pour la procédure d'installation — 4 commandes, dont `certbot --nginx` qui gère le
+  certificat automatiquement, en réutilisant le Certbot déjà en place pour l'autre site). Sauter
+  entièrement les étapes 2 (amorçage SSL Docker) et 4 (certificat Docker) ci-dessous dans ce cas.
 
 ## 1. Récupérer le code et configurer l'environnement
 
