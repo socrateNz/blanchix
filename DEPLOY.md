@@ -100,18 +100,26 @@ arrière-plan (boucle toutes les 12h) — rien d'autre à faire ensuite.
 Aucune perte possible : `mongodump`/`mongorestore` font une **copie**, Atlas n'est jamais
 touché. Ne basculer l'app dessus qu'après vérification.
 
+**Piège réel rencontré** : `MONGODB_URI` (dans `.env.local`) ne précise aucun nom de base
+(`mongodb+srv://...@cluster0.cb8jkba.mongodb.net`, rien après) — Mongoose retombe alors sur le
+nom par défaut du driver MongoDB, **`test`**, pas `blanchix`. Confirmé en interrogeant
+directement l'app (`mongoose.connection.name` → `"test"`). Le conteneur, lui, est configuré pour
+une base `blanchix`. Il faut donc renommer la base pendant la restauration (`--nsFrom`/`--nsTo`),
+sinon les données atterrissent dans une base `test` que l'app ne consulte jamais.
+
 ```bash
 source .env   # pour avoir $MONGO_APP_USERNAME/$MONGO_APP_PASSWORD dans ce shell
 
 # Depuis le VPS (Atlas doit autoriser l'IP du VPS dans Network Access, ou temporairement 0.0.0.0/0)
 docker run --rm -v $(pwd):/dump mongo:7 \
-  mongodump --uri="<URI ATLAS ACTUELLE — voir MONGODB_URI dans .env.local>" --archive=/dump/blanchix.dump --gzip
+  mongodump --uri="<URI ATLAS ACTUELLE — voir MONGODB_URI dans .env.local>" --db=test --archive=/dump/blanchix.dump --gzip
 
-# Copier le dump dans le conteneur mongo et restaurer
+# Copier le dump dans le conteneur mongo et restaurer en renommant test → blanchix
 docker cp blanchix.dump blanchix-mongo-1:/tmp/blanchix.dump
 docker compose exec mongo mongorestore \
   --archive=/tmp/blanchix.dump --gzip \
-  --uri="mongodb://${MONGO_APP_USERNAME}:${MONGO_APP_PASSWORD}@localhost:27017/blanchix?authSource=blanchix"
+  --nsFrom="test.*" --nsTo="blanchix.*" \
+  --uri="mongodb://${MONGO_APP_USERNAME}:${MONGO_APP_PASSWORD}@localhost:27017/?authSource=blanchix"
 ```
 
 **Vérification avant bascule** — comparer les compteurs entre Atlas et le nouveau conteneur

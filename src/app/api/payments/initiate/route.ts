@@ -93,8 +93,11 @@ export async function POST(request: NextRequest) {
     tentatives: 1,
   });
 
-  const origin = request.nextUrl.origin;
-  const retourUrl = `${origin}/commander/paiement`;
+  // request.nextUrl.origin reflète l'adresse d'écoute interne du serveur (0.0.0.0:3000 en
+  // conteneur Docker derrière un reverse proxy), pas l'adresse publique réelle — même avec
+  // Nginx qui transmet correctement le header Host. NEXTAUTH_URL est la source fiable, déjà
+  // configurée avec la vraie adresse publique pour cet environnement.
+  const retourUrl = `${process.env.NEXTAUTH_URL}/commander/paiement`;
   let reponse;
   try {
     reponse = await creerCodeesCheckout({
