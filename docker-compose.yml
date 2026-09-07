@@ -1,0 +1,88 @@
+# Nom de projet fixe : les volumes nommés ci-dessous deviennent "blanchix_<nom>" de façon
+# prévisible, quel que soit le nom du dossier où le dépôt est cloné sur le VPS (sinon Docker
+# Compose préfixe avec le nom du dossier courant, ce qui casse les commandes qui référencent
+# un volume par son nom exact — voir DEPLOY.md, amorçage du certificat SSL).
+name: blanchix
+
+services:
+  app:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MONGODB_URI: mongodb://${MONGO_APP_USERNAME}:${MONGO_APP_PASSWORD}@mongo:27017/blanchix?authSource=blanchix
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    # Pas de "ports:" ici, volontairement — accessible uniquement depuis les autres conteneurs
+    # sur le réseau Docker interne, jamais depuis l'extérieur du VPS (§14 du cahier des charges).
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_APP_USERNAME: ${MONGO_APP_USERNAME}
+      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD}
+    volumes:
+      - mongo_data:/data/db
+      - ./mongo-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - certbot_certs:/etc/letsencrypt:ro
+      - certbot_www:/var/www/certbot:ro
+    depends_on:
+      - app
+
+  certbot:
+    image: certbot/certbot
+    restart: unless-stopped
+    volumes:
+      - certbot_certs:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+    entrypoint: >
+      /bin/sh -c "trap exit TERM;
+      while :; do
+        certbot renew --webroot -w /var/www/certbot --quiet;
+        sleep 12h & wait $$!;
+      done"
+
+  cron:
+    build: ./cron
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MONGO_APP_USERNAME: ${MONGO_APP_USERNAME}
+      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD}
+    volumes:
+      - ./scripts/backup-mongo.sh:/scripts/backup-mongo.sh:ro
+      - mongo_backups:/backups
+    depends_on:
+      mongo:
+        condition: service_healthy
+      app:
+        condition: service_started
+
+volumes:
+  mongo_data:
+  mongo_backups:
+  certbot_certs:
+  certbot_www:

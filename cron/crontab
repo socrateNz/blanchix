@@ -1,0 +1,7 @@
+# Remplace Vercel Cron (voir vercel.json, conservé pour l'historique) — même planification
+# exacte (0 3 * * *) que l'ancien job Vercel. Format système (/etc/cron.d/), qui exige un champ
+# utilisateur (root ici) contrairement à un crontab utilisateur classique.
+# Chaque commande source /etc/profile.d/docker-env.sh en premier (généré par entrypoint.sh au
+# démarrage) car cron n'hérite jamais des variables d'environnement du conteneur.
+0 3 * * * root . /etc/profile.d/docker-env.sh; curl -fsS -H "Authorization: Bearer $CRON_SECRET" http://app:3000/api/cron/generate-slots >> /var/log/cron.log 2>&1
+30 3 * * * root . /etc/profile.d/docker-env.sh; /scripts/backup-mongo.sh >> /var/log/cron.log 2>&1
