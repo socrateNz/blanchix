@@ -27,6 +27,7 @@ async function envoyer(params: {
   destinataireId: string;
   evenement: string;
   email: string;
+  bcc?: string;
   subject: string;
   html: string;
   attachments?: { filename: string; content: Buffer }[];
@@ -43,6 +44,7 @@ async function envoyer(params: {
   try {
     await sendMail({
       to: params.email,
+      bcc: params.bcc,
       subject: params.subject,
       html: params.html,
       text: params.subject,
@@ -121,6 +123,9 @@ export async function notifierCommandeConfirmee(order: OrderHydrated): Promise<v
     destinataireId: String(client._id),
     evenement: "commande_confirmee",
     email: client.email,
+    // Copie de toutes les confirmations de commande vers une adresse de suivi interne,
+    // sur demande explicite — optionnel (pas défini = comportement inchangé).
+    bcc: process.env.COMMANDE_COPIE_EMAIL,
     subject,
     html,
     attachments: [{ filename: `${order.numero}.pdf`, content: Buffer.from(pdfBytes) }],

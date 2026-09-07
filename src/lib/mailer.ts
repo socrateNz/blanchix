@@ -23,6 +23,7 @@ function getTransporter() {
 
 export async function sendMail(options: {
   to: string;
+  bcc?: string;
   subject: string;
   html: string;
   text: string;
