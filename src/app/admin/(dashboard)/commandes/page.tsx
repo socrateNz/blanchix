@@ -17,6 +17,7 @@ import { inputClasses } from "@/components/ui/Field";
 import Button from "@/components/ui/Button";
 import StatutBadge from "@/components/admin/StatutBadge";
 import CommandeActionsMenu from "@/components/admin/CommandeActionsMenu";
+import ActualiserPaiementButton from "@/components/admin/ActualiserPaiementButton";
 
 interface Commande {
   id: string;
@@ -153,6 +154,7 @@ export default function AdminCommandesPage() {
                         >
                           <Eye className="h-4 w-4" />
                         </Link>
+                        <ActualiserPaiementButton orderId={c.id} orderNumero={c.numero} statut={c.statut} />
                         <CommandeActionsMenu
                           orderId={c.id}
                           orderNumero={c.numero}

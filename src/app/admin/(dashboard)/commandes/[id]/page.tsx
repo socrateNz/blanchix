@@ -3,9 +3,11 @@
 import { use, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
+import { MessageCircle } from "lucide-react";
 import { api } from "@/lib/axios";
 import { formatFCFA } from "@/lib/utils";
 import { formatZoneAdresse } from "@/lib/adresse";
+import { construireLienWhatsapp } from "@/lib/whatsapp";
 import { DELAI_LABELS } from "@/lib/pricing-constants";
 import {
   PROCHAINE_ETAPE,
@@ -16,7 +18,7 @@ import {
   deriveStatutCommandeAffiche,
   type OrderStatus,
 } from "@/lib/orderStatuses";
-import Button from "@/components/ui/Button";
+import Button, { buttonClasses } from "@/components/ui/Button";
 import { inputClasses } from "@/components/ui/Field";
 import StatutBadge from "@/components/admin/StatutBadge";
 import AssignerLivreurDialog from "@/components/admin/AssignerLivreurDialog";
@@ -101,6 +103,38 @@ export default function AdminCommandeDetailPage({ params }: { params: Promise<{ 
   const peutMarquerPaye = data.paiement?.methode === "espece" && data.paiement?.statut === "a_percevoir";
   const peutVerifierPaiement = data.statut === "EN_ATTENTE_PAIEMENT";
 
+  // "Choix libre" du destinataire (pas de numéro fixé, l'admin choisit à qui l'envoyer une fois
+  // WhatsApp ouvert) — construireLienWhatsapp("", ...) produit https://wa.me/?text=..., qui
+  // ouvre WhatsApp sur le sélecteur de contact plutôt qu'une conversation précise.
+  const lignesArticles = [
+    ...data.articles.map((a) => `- ${a.nom} × ${a.quantite} — ${formatFCFA(a.prixUnitaire * a.quantite)}`),
+    ...data.articlesPersonnalises.map(
+      (a) => `- ${a.nom} × ${a.quantiteEstimee} (hors catalogue, ${a.prixPropose != null ? formatFCFA(a.prixPropose) : "prix à confirmer"})`
+    ),
+  ].join("\n");
+  const messagePartage = [
+    `📦 Commande ${data.numero}`,
+    "",
+    data.client ? `Client : ${data.client.nom} (${data.client.telephone})` : null,
+    `Statut : ${STATUT_COMMANDE_AFFICHE_LABELS[deriveStatutCommandeAffiche(data.statut)].label} — Paiement : ${STATUT_PAIEMENT_AFFICHE_LABELS[deriveStatutPaiementAffiche(data)].label}`,
+    "",
+    "Articles :",
+    lignesArticles,
+    "",
+    `Collecte : ${formatZoneAdresse(data.adresseCollecte)}`,
+    `Livraison : ${formatZoneAdresse(data.adresseLivraison)}`,
+    `Délai : ${DELAI_LABELS[data.delai]?.label ?? data.delai}`,
+    "",
+    `Sous-total : ${formatFCFA(data.sousTotal)}`,
+    `Livraison : ${formatFCFA(data.fraisLivraison)}`,
+    `Majoration délai : ${formatFCFA(data.majorationDelai)}`,
+    `Total : ${formatFCFA(data.total)}`,
+    data.paiement?.methode ? "" : null,
+    data.paiement?.methode ? `Reçu : ${typeof window !== "undefined" ? window.location.origin : ""}/api/orders/${data.id}/recu` : null,
+  ]
+    .filter((ligne) => ligne !== null)
+    .join("\n");
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -116,6 +150,15 @@ export default function AdminCommandeDetailPage({ params }: { params: Promise<{ 
             labels={STATUT_COMMANDE_AFFICHE_LABELS}
           />
           <StatutBadge statut={deriveStatutPaiementAffiche(data)} labels={STATUT_PAIEMENT_AFFICHE_LABELS} />
+          <a
+            href={construireLienWhatsapp("", messagePartage)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={buttonClasses("secondary", "px-3!")}
+            title="Partager sur WhatsApp"
+          >
+            <MessageCircle className="h-4 w-4" />
+          </a>
         </div>
       </div>
 
