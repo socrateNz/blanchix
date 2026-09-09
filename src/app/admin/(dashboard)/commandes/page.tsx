@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { Search } from "lucide-react";
+import { Search, Eye } from "lucide-react";
 import { api } from "@/lib/axios";
 import { formatFCFA } from "@/lib/utils";
 import {
@@ -144,14 +144,24 @@ export default function AdminCommandesPage() {
                       {new Date(c.createdAt).toLocaleString("fr-FR")}
                     </td>
                     <td className="px-4 py-3">
-                      <CommandeActionsMenu
-                        orderId={c.id}
-                        orderNumero={c.numero}
-                        statut={c.statut}
-                        paiement={c.paiement}
-                        livreurCollecte={c.livreurCollecte}
-                        livreurLivraison={c.livreurLivraison}
-                      />
+                      <div className="flex items-center gap-1">
+                        <Link
+                          href={`/admin/commandes/${c.id}`}
+                          aria-label={`Voir la commande ${c.numero}`}
+                          title="Voir"
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-ardoise outline-none hover:bg-brume focus-visible:ring-2 focus-visible:ring-cyan"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Link>
+                        <CommandeActionsMenu
+                          orderId={c.id}
+                          orderNumero={c.numero}
+                          statut={c.statut}
+                          paiement={c.paiement}
+                          livreurCollecte={c.livreurCollecte}
+                          livreurLivraison={c.livreurLivraison}
+                        />
+                      </div>
                     </td>
                   </tr>
                 ))}
