@@ -53,6 +53,18 @@ export default function AdminReglagesPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-reglages"] }),
   });
 
+  // Rattrapage ponctuel : attribue les points de fidélité aux commandes déjà confirmées avant
+  // l'introduction de cette règle (voir src/app/api/admin/loyalty/backfill/route.ts). Se
+  // relance sans risque, les commandes déjà créditées sont ignorées automatiquement.
+  const rattrapagePoints = useMutation({
+    mutationFn: async () => {
+      const { data } = await api.post<{ commandesTraitees: number; pointsAttribues: number }>(
+        "/admin/loyalty/backfill"
+      );
+      return data;
+    },
+  });
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -133,6 +145,32 @@ export default function AdminReglagesPage() {
           </div>
         </form>
       )}
+
+      <div className="rounded-2xl border border-marine/12 bg-white p-6 shadow-sm">
+        <h2 className="font-body text-sm font-semibold text-marine">Maintenance</h2>
+        <p className="mt-1 font-body text-xs text-ardoise">
+          Attribue les points de fidélité (500 FCFA = 1 point) aux commandes déjà confirmées avant
+          l&apos;introduction de cette règle. Sans effet sur les commandes déjà créditées — peut être relancé
+          sans risque.
+        </p>
+        <div className="mt-3 flex items-center gap-3">
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={rattrapagePoints.isPending}
+            onClick={() => rattrapagePoints.mutate()}
+          >
+            {rattrapagePoints.isPending ? "Traitement…" : "Rattraper les points de fidélité"}
+          </Button>
+          {rattrapagePoints.isSuccess && (
+            <span className="font-body text-sm text-succes">
+              {rattrapagePoints.data.commandesTraitees} commande(s) créditée(s), {rattrapagePoints.data.pointsAttribues}{" "}
+              point(s) attribué(s).
+            </span>
+          )}
+          {rattrapagePoints.isError && <span className="font-body text-sm text-alerte">Échec du rattrapage.</span>}
+        </div>
+      </div>
     </div>
   );
 }
