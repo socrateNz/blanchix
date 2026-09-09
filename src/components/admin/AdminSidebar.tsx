@@ -11,6 +11,7 @@ import {
   Truck,
   MapPin,
   Settings,
+  Users,
 } from "lucide-react";
 import {
   Sidebar,
@@ -28,6 +29,7 @@ import Logo from "@/components/brand/Logo";
 const LIENS = [
   { href: "/admin", label: "Tableau de bord", icon: LayoutDashboard },
   { href: "/admin/commandes", label: "Commandes", icon: ClipboardList },
+  { href: "/admin/utilisateurs", label: "Utilisateurs", icon: Users },
   { href: "/admin/catalogue", label: "Catalogue", icon: ShoppingBasket },
   { href: "/admin/creneaux", label: "Créneaux", icon: CalendarClock },
   { href: "/admin/livreurs", label: "Livreurs", icon: Truck },
