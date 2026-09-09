@@ -18,11 +18,17 @@ export const PAIEMENT_EXPIRATION_MS = 30 * 60 * 1000;
  * Revérifie un paiement en cours directement auprès de Codees (jamais sur la base d'un contenu
  * de webhook non authentifié — cahier des charges section 6.1, et Codees ne documente de toute
  * façon aucun format de webhook vérifiable) et applique la transition de statut de commande
- * correspondante. Idempotent : un paiement déjà dans un statut terminal n'est jamais retraité
- * (section 6.3).
+ * correspondante. Idempotent par défaut : un paiement déjà dans un statut terminal n'est pas
+ * retraité (section 6.3) — sauf `forcer: true`, réservé à la revérification manuelle
+ * déclenchée par un admin (bouton "Actualiser"), pour les cas où le statut local ("échoué",
+ * "expiré"...) est lui-même erroné (ex. webhook jamais reçu, faux négatif) et où le seul moyen
+ * de le corriger est de rappeler Codees même si on pensait le dossier clos.
  */
-export async function verifierEtAppliquerPaiement(payment: PaymentHydrated): Promise<PaymentHydrated> {
-  if (STATUTS_PAIEMENT_TERMINAUX.includes(payment.statut ?? "")) {
+export async function verifierEtAppliquerPaiement(
+  payment: PaymentHydrated,
+  options: { forcer?: boolean } = {}
+): Promise<PaymentHydrated> {
+  if (!options.forcer && STATUTS_PAIEMENT_TERMINAUX.includes(payment.statut ?? "")) {
     return payment;
   }
   if (!payment.referenceExterne) {

@@ -154,7 +154,7 @@ export default function AdminCommandesPage() {
                         >
                           <Eye className="h-4 w-4" />
                         </Link>
-                        <ActualiserPaiementButton orderId={c.id} orderNumero={c.numero} statut={c.statut} />
+                        <ActualiserPaiementButton orderId={c.id} orderNumero={c.numero} />
                         <CommandeActionsMenu
                           orderId={c.id}
                           orderNumero={c.numero}

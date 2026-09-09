@@ -101,7 +101,6 @@ export default function AdminCommandeDetailPage({ params }: { params: Promise<{ 
   const peutAnnuler = STATUTS_ANNULABLES.includes(data.statut);
   const peutRembourser = STATUTS_REMBOURSABLES.includes(data.statut);
   const peutMarquerPaye = data.paiement?.methode === "espece" && data.paiement?.statut === "a_percevoir";
-  const peutVerifierPaiement = data.statut === "EN_ATTENTE_PAIEMENT";
 
   // "Choix libre" du destinataire (pas de numéro fixé, l'admin choisit à qui l'envoyer une fois
   // WhatsApp ouvert) — construireLienWhatsapp("", ...) produit https://wa.me/?text=..., qui
@@ -185,16 +184,14 @@ export default function AdminCommandeDetailPage({ params }: { params: Promise<{ 
               Marquer payé
             </Button>
           )}
-          {peutVerifierPaiement && (
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={verifierPaiement.isPending}
-              onClick={() => verifierPaiement.mutate()}
-            >
-              Vérifier le paiement
-            </Button>
-          )}
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={verifierPaiement.isPending}
+            onClick={() => verifierPaiement.mutate()}
+          >
+            Vérifier le paiement
+          </Button>
           {peutAnnuler && (
             <Button
               type="button"

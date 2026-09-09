@@ -5,23 +5,26 @@ import { isAxiosError } from "axios";
 import { RefreshCw } from "lucide-react";
 import { api } from "@/lib/axios";
 import { STATUT_PAIEMENT_LABELS } from "@/lib/paiement";
-import type { OrderStatus } from "@/lib/orderStatuses";
 
 /**
  * Revérifie réellement le statut de paiement auprès de Codees (même action "verifier_paiement"
  * que le bouton "Vérifier le paiement" de la page de détail — voir
  * src/app/admin/(dashboard)/commandes/[id]/page.tsx), mais en icône compacte pour une ligne du
- * tableau des commandes. Visible uniquement quand un paiement en ligne est encore en attente —
- * les autres statuts n'ont rien à revérifier auprès du prestataire.
+ * tableau des commandes.
+ *
+ * Visible sur TOUTES les commandes (pas seulement "en attente de paiement") — sur demande
+ * explicite : un statut "échoué"/"expiré" en base peut lui-même être erroné (webhook jamais
+ * reçu, faux négatif), et le seul moyen de le corriger est de forcer une revérification même
+ * sur un dossier qu'on pensait clos. La route API applique `forcer: true` pour cette raison
+ * (voir src/services/payment.ts). Sur une commande sans aucune tentative de paiement (espèces,
+ * jamais initiée...), l'action échoue simplement avec un message clair plutôt que de planter.
  */
 export default function ActualiserPaiementButton({
   orderId,
   orderNumero,
-  statut,
 }: {
   orderId: string;
   orderNumero: string;
-  statut: OrderStatus;
 }) {
   const queryClient = useQueryClient();
 
@@ -45,8 +48,6 @@ export default function ActualiserPaiementButton({
       );
     },
   });
-
-  if (statut !== "EN_ATTENTE_PAIEMENT") return null;
 
   return (
     <button

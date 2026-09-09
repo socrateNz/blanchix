@@ -87,7 +87,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     const statutPaiementAvant = paiementAVerifier.statut;
     try {
-      await verifierEtAppliquerPaiement(paiementAVerifier);
+      // forcer: true — un admin peut vouloir revérifier même un paiement déjà "échoué"/"expiré"
+      // en base, si ce statut local est lui-même suspect (voir ActualiserPaiementButton).
+      await verifierEtAppliquerPaiement(paiementAVerifier, { forcer: true });
     } catch (err) {
       // verifierCodeesCheckout rejette sur toute réponse non-2xx de Codees (identifiant
       // introuvable, prestataire indisponible...) — sans ce catch, une simple indisponibilité
