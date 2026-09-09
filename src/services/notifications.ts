@@ -6,6 +6,7 @@ import type { OrderStatus } from "@/lib/orderStatuses";
 import { sendMail } from "@/lib/mailer";
 import { envoyerPush } from "@/lib/webpush";
 import { genererRecuPdf } from "@/services/receipt";
+import { attribuerPointsFidelite } from "@/services/loyalty";
 import {
   buildEmailBienvenue,
   buildEmailConfirmationCommande,
@@ -113,6 +114,10 @@ export async function notifierBienvenue(user: UserHydrated): Promise<void> {
 export async function notifierCommandeConfirmee(order: OrderHydrated): Promise<void> {
   const client = await User.findById(order.client);
   if (!client) return;
+
+  // Attribue order.pointsGagnes en mémoire — sauvegardé par le order.save() ci-dessous, pas
+  // besoin d'un second aller-retour DB pour la commande.
+  await attribuerPointsFidelite(order, client);
 
   const pdfBytes = await genererRecuPdf(order, client);
   order.recuPdfUrl = `/api/orders/${order._id}/recu`;
