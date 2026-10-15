@@ -68,6 +68,7 @@ export type CommandeAction =
   | { type: "SET_ADRESSE_COLLECTE"; adresse: AdresseDraft }
   | { type: "SET_CRENEAU_COLLECTE"; creneauId: string }
   | { type: "SET_ARTICLE_QTY"; article: Omit<ArticlePanier, "quantite">; quantite: number }
+  | { type: "REMPLACER_ARTICLES"; articles: ArticlePanier[] }
   | { type: "ADD_ARTICLE_PERSONNALISE"; article: ArticlePersonnaliseDraft }
   | { type: "REMOVE_ARTICLE_PERSONNALISE"; index: number }
   | { type: "SET_NOTES_CLIENT"; notes: string }
@@ -99,6 +100,8 @@ export function commandeReducer(state: CommandeState, action: CommandeAction): C
         articles: [...sansArticle, { ...action.article, quantite: action.quantite }],
       };
     }
+    case "REMPLACER_ARTICLES":
+      return { ...state, articles: action.articles };
     case "ADD_ARTICLE_PERSONNALISE":
       return { ...state, articlesPersonnalises: [...state.articlesPersonnalises, action.article] };
     case "REMOVE_ARTICLE_PERSONNALISE":

@@ -1,8 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { RotateCcw } from "lucide-react";
+import { api } from "@/lib/axios";
 import { useCommande } from "@/context/useCommande";
+import type { ArticlePanier } from "@/context/commandeReducer";
 import { useCatalog } from "@/hooks/useCatalog";
 import { useSettings } from "@/hooks/useSettings";
 import { inputClasses } from "@/components/ui/Field";
@@ -12,18 +17,56 @@ import ArticlePersonnaliseForm from "@/components/commander/ArticlePersonnaliseF
 import { formatFCFA } from "@/lib/utils";
 import { vibrer } from "@/lib/haptics";
 
+interface CommandePassee {
+  id: string;
+  numero: string;
+}
+
 export default function StepPanier() {
   const { state, dispatch } = useCommande();
   const router = useRouter();
+  const { data: session } = useSession();
   const { data: catalog, isLoading, isError } = useCatalog();
   const { data: settings } = useSettings();
 
-  useEffect(() => {
-    if (!state.creneauCollecteId) router.replace("/commander/adresse");
-  }, [state.creneauCollecteId, router]);
-
   const [notes, setNotes] = useState(state.notesClient);
   const [error, setError] = useState("");
+
+  const { data: mesCommandes } = useQuery({
+    queryKey: ["mes-commandes"],
+    queryFn: async () => {
+      const { data } = await api.get<CommandePassee[]>("/mes-commandes");
+      return data;
+    },
+    enabled: !!session?.user,
+  });
+  const derniereCommande = mesCommandes?.[0] ?? null;
+
+  // Recopie les articles du catalogue de la dernière commande, aux prix ACTUELS du catalogue
+  // (le serveur les relit de toute façon) — les articles retirés du catalogue depuis sont
+  // ignorés, les articles personnalisés aussi (leur prix reste à confirmer à chaque fois).
+  const reprise = useMutation({
+    mutationFn: async (orderId: string) => {
+      const { data } = await api.get<{ articles: { catalogItemId: string; quantite: number }[] }>(
+        `/mes-commandes/${orderId}`
+      );
+      return data.articles;
+    },
+    onSuccess: (articlesPasses) => {
+      const parId = new Map(catalog?.map((item) => [item.id, item]));
+      const articles: ArticlePanier[] = articlesPasses.flatMap((a) => {
+        const item = parId.get(String(a.catalogItemId));
+        return item ? [{ catalogItemId: item.id, nom: item.nom, prixUnitaire: item.prixUnitaire, quantite: a.quantite }] : [];
+      });
+      if (articles.length === 0) {
+        setError("Les articles de votre dernière commande ne sont plus disponibles.");
+        return;
+      }
+      vibrer(8);
+      setError("");
+      dispatch({ type: "REMPLACER_ARTICLES", articles });
+    },
+  });
 
   function getQuantite(catalogItemId: string) {
     return state.articles.find((a) => a.catalogItemId === catalogItemId)?.quantite ?? 0;
@@ -53,7 +96,7 @@ export default function StepPanier() {
       return;
     }
     dispatch({ type: "SET_NOTES_CLIENT", notes });
-    router.push("/commander/delai");
+    router.push("/commander/adresse");
   }
 
   return (
@@ -64,6 +107,27 @@ export default function StepPanier() {
           Choisissez vos vêtements — le total se met à jour automatiquement.
         </p>
       </div>
+
+      {derniereCommande && catalog && (
+        <button
+          type="button"
+          onClick={() => reprise.mutate(derniereCommande.id)}
+          disabled={reprise.isPending}
+          className="flex items-center gap-3 rounded-xl border border-bleu/30 bg-bleu/5 p-4 text-left transition-colors hover:bg-bleu/10 disabled:opacity-60"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-bleu">
+            <RotateCcw className="h-4 w-4" />
+          </span>
+          <span className="flex-1">
+            <span className="block font-body text-sm font-semibold text-marine">
+              {reprise.isPending ? "Chargement…" : "Reprendre ma dernière commande"}
+            </span>
+            <span className="block font-body text-xs text-ardoise">
+              Mêmes articles que la commande {derniereCommande.numero} — modifiables ensuite.
+            </span>
+          </span>
+        </button>
+      )}
 
       {isLoading && <p className="font-body text-sm text-ardoise">Chargement du catalogue…</p>}
       {isError && (
@@ -160,10 +224,13 @@ export default function StepPanier() {
 
       {error && <p className="font-body text-xs text-alerte">{error}</p>}
 
-      <div className="flex justify-between">
-        <Button type="button" variant="ghost" onClick={() => router.push("/commander/adresse")}>
-          Retour
-        </Button>
+      {/* Toujours visible pendant le défilement du catalogue — au-dessus de la barre d'onglets
+          mobile (72px, cf. TabBar), en bas de l'écran sur desktop. */}
+      <div className="sticky bottom-[calc(84px+env(safe-area-inset-bottom))] z-20 -mx-2 flex items-center justify-between gap-3 rounded-xl border border-marine/10 bg-white/95 p-3 shadow-lg backdrop-blur sm:bottom-4">
+        <div>
+          <p className="font-body text-xs text-ardoise">Sous-total</p>
+          <p className="font-mono text-base font-bold text-marine">{formatFCFA(sousTotal)}</p>
+        </div>
         <Button type="button" onClick={handleContinuer}>
           Continuer
         </Button>

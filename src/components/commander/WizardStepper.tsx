@@ -3,11 +3,9 @@
 import { usePathname } from "next/navigation";
 
 const ETAPES = [
-  { slug: "informations", label: "Informations" },
-  { slug: "adresse", label: "Adresse" },
   { slug: "panier", label: "Panier" },
-  { slug: "delai", label: "Délai" },
-  { slug: "paiement", label: "Paiement" },
+  { slug: "adresse", label: "Collecte" },
+  { slug: "paiement", label: "Confirmation" },
 ];
 
 export default function WizardStepper() {

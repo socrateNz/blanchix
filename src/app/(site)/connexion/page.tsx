@@ -43,7 +43,11 @@ export default function ConnexionPage() {
       setErreurConnexion("Code invalide ou expiré.");
       return;
     }
-    router.push("/compte");
+    // ?retour= : depuis le tunnel de commande, on y revient (brouillon conservé en
+    // sessionStorage). Lu au clic plutôt que via useSearchParams (qui imposerait un Suspense).
+    // Chemins internes uniquement — jamais de redirection ouverte vers un autre site.
+    const retour = new URLSearchParams(window.location.search).get("retour");
+    router.push(retour?.startsWith("/") && !retour.startsWith("//") ? retour : "/compte");
     router.refresh();
   }
 

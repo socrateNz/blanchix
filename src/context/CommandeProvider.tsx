@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useEffect, useReducer, type Dispatch } from "react";
+import { createContext, useEffect, useReducer, useState, type Dispatch } from "react";
 import {
   commandeReducer,
   initialCommandeState,
@@ -11,11 +11,15 @@ import {
 const STORAGE_KEY = "blanchix-commande-draft";
 
 export const CommandeContext = createContext<
-  { state: CommandeState; dispatch: Dispatch<CommandeAction> } | null
+  { state: CommandeState; dispatch: Dispatch<CommandeAction>; hydrated: boolean } | null
 >(null);
 
 export default function CommandeProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(commandeReducer, initialCommandeState);
+  // Les effets des étapes (enfants) s'exécutent AVANT celui-ci : sans ce drapeau, leurs gardes
+  // de redirection voient l'état vierge au rechargement (ex. retour de Codees sur /paiement)
+  // et renvoient le client en arrière avant que le brouillon ne soit relu.
+  const [hydrated, setHydrated] = useState(false);
 
   // Hydratation après montage uniquement, pour ne jamais désynchroniser le rendu serveur/client.
   useEffect(() => {
@@ -27,11 +31,15 @@ export default function CommandeProvider({ children }: { children: React.ReactNo
         // Brouillon corrompu — on repart d'un état vierge silencieusement.
       }
     }
+    // Différé (react-hooks/set-state-in-effect) — même contournement qu'ailleurs dans le code.
+    Promise.resolve().then(() => setHydrated(true));
   }, []);
 
   useEffect(() => {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }, [state]);
+    if (hydrated) sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }, [state, hydrated]);
 
-  return <CommandeContext.Provider value={{ state, dispatch }}>{children}</CommandeContext.Provider>;
+  return (
+    <CommandeContext.Provider value={{ state, dispatch, hydrated }}>{children}</CommandeContext.Provider>
+  );
 }

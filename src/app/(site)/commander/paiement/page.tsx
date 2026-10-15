@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useMutation } from "@tanstack/react-query";
+import Link from "next/link";
+import { useSession } from "next-auth/react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
-import { Banknote, Smartphone } from "lucide-react";
+import { Banknote, Smartphone, UserRound } from "lucide-react";
 import { useCommande } from "@/context/useCommande";
 import { api } from "@/lib/axios";
 import { formatFCFA } from "@/lib/utils";
@@ -13,9 +15,10 @@ import { computeOrderTotals } from "@/services/pricing";
 import { useZones } from "@/hooks/useZones";
 import { useSettings } from "@/hooks/useSettings";
 import Button from "@/components/ui/Button";
+import Field, { inputClasses } from "@/components/ui/Field";
 import CartSummary from "@/components/commander/CartSummary";
 import StatutPaiement from "@/components/commander/StatutPaiement";
-import type { OrderResult } from "@/context/commandeReducer";
+import type { ClientDraft, OrderResult } from "@/context/commandeReducer";
 
 // Un seul choix "paiement mobile" plutôt que Orange Money/MTN MoMo séparés : avec Codees, ce
 // choix se fait sur leur page de paiement hébergée, jamais transmis à notre API (voir
@@ -25,13 +28,47 @@ const MOYENS_PAIEMENT = [
   { id: "espece", label: "Espèces à la collecte", icon: Banknote },
 ] as const;
 
+function validerClient(client: ClientDraft) {
+  const erreurs: Record<string, string> = {};
+  if (!client.nom.trim()) erreurs.nom = "Le nom est requis.";
+  if (client.telephone.trim().length < 8) erreurs.telephone = "Numéro de téléphone invalide.";
+  if (!/^\S+@\S+\.\S+$/.test(client.email.trim())) erreurs.email = "Email invalide.";
+  return erreurs;
+}
+
 export default function StepPaiement() {
-  const { state, dispatch } = useCommande();
+  const { state, dispatch, hydrated } = useCommande();
   const router = useRouter();
+  const { data: session } = useSession();
 
   useEffect(() => {
-    if (!state.delai) router.replace("/commander/delai");
-  }, [state.delai, router]);
+    if (hydrated && !state.orderResult && (!state.delai || !state.creneauCollecteId)) {
+      router.replace("/commander/adresse");
+    }
+  }, [hydrated, state.orderResult, state.delai, state.creneauCollecteId, router]);
+
+  const { data: mesInfos } = useQuery({
+    queryKey: ["mes-infos"],
+    queryFn: async () => {
+      const { data } = await api.get<ClientDraft>("/mes-infos");
+      return data;
+    },
+    enabled: !!session?.user,
+  });
+
+  // Saisie en cours (null = rien touché), sinon brouillon déjà saisi, sinon profil du compte.
+  const [saisieClient, setSaisieClient] = useState<ClientDraft | null>(null);
+  const client: ClientDraft = saisieClient ?? (state.client.nom ? state.client : null) ?? {
+    nom: mesInfos?.nom ?? "",
+    telephone: mesInfos?.telephone ?? "",
+    email: mesInfos?.email ?? "",
+    whatsapp: mesInfos?.whatsapp ?? "",
+  };
+  const [modifierClient, setModifierClient] = useState(false);
+  const [erreursClient, setErreursClient] = useState<Record<string, string>>({});
+  // Coordonnées déjà connues et valides : simple résumé, le formulaire reste à un clic.
+  const afficherResume =
+    !modifierClient && saisieClient === null && Object.keys(validerClient(client)).length === 0;
 
   const [moyen, setMoyen] = useState<(typeof MOYENS_PAIEMENT)[number]["id"]>("mobile_money");
   // Toujours false au (re)montage — y compris après le retour de Codees (nouvelle page).
@@ -44,9 +81,9 @@ export default function StepPaiement() {
   const { data: settings } = useSettings();
 
   const orderMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (client: ClientDraft) => {
       const { data } = await api.post<OrderResult & { statut: string }>("/orders", {
-        client: state.client,
+        client,
         adresseCollecte: state.adresseCollecte,
         adresseLivraison: state.adresseLivraison,
         creneauCollecteId: state.creneauCollecteId,
@@ -70,7 +107,14 @@ export default function StepPaiement() {
     let orderId = state.orderResult?.id;
 
     if (!orderId) {
-      const order = await orderMutation.mutateAsync();
+      const erreurs = validerClient(client);
+      setErreursClient(erreurs);
+      if (Object.keys(erreurs).length > 0) {
+        setModifierClient(true);
+        return;
+      }
+      dispatch({ type: "SET_CLIENT", client });
+      const order = await orderMutation.mutateAsync(client);
       dispatch({
         type: "SET_ORDER_RESULT",
         result: {
@@ -127,9 +171,86 @@ export default function StepPaiement() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="font-display text-2xl font-bold text-marine">Récapitulatif et paiement</h1>
-        <p className="mt-1 font-body text-sm text-ardoise">Vérifiez votre commande avant de valider.</p>
+        <h1 className="font-display text-2xl font-bold text-marine">Confirmation</h1>
+        <p className="mt-1 font-body text-sm text-ardoise">Vérifiez votre commande, puis validez.</p>
       </div>
+
+      {/* Après un échec de paiement, la commande existe déjà avec ses coordonnées : plus modifiables. */}
+      {!state.orderResult && (
+        <div>
+          <span className="font-body text-sm font-semibold text-marine">Vos coordonnées</span>
+          {afficherResume ? (
+            <div className="mt-2 flex items-start gap-3 rounded-xl border border-ardoise/15 p-3">
+              <UserRound className="mt-0.5 h-4 w-4 shrink-0 text-bleu" />
+              <div className="flex-1 font-body text-sm">
+                <p className="font-semibold text-encre">{client.nom}</p>
+                <p className="text-ardoise">
+                  {client.telephone} · {client.email}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModifierClient(true)}
+                className="font-body text-xs font-semibold text-bleu hover:underline"
+              >
+                Modifier
+              </button>
+            </div>
+          ) : (
+            <div className="mt-2 flex flex-col gap-4">
+              {!session?.user && (
+                <p className="font-body text-xs text-ardoise">
+                  Déjà client ?{" "}
+                  <Link href="/connexion?retour=/commander/paiement" className="font-semibold text-bleu hover:underline">
+                    Connectez-vous
+                  </Link>{" "}
+                  pour préremplir vos coordonnées et votre adresse.
+                </p>
+              )}
+              <Field label="Nom complet" error={erreursClient.nom}>
+                <input
+                  className={inputClasses}
+                  value={client.nom}
+                  onChange={(e) => setSaisieClient({ ...client, nom: e.target.value })}
+                  placeholder="Ex. Alex Mbarga"
+                  autoComplete="name"
+                />
+              </Field>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Téléphone" error={erreursClient.telephone}>
+                  <input
+                    className={inputClasses}
+                    value={client.telephone}
+                    onChange={(e) => setSaisieClient({ ...client, telephone: e.target.value })}
+                    placeholder="Ex. 6XX XX XX XX"
+                    inputMode="tel"
+                    autoComplete="tel"
+                  />
+                </Field>
+                <Field label="WhatsApp" optional>
+                  <input
+                    className={inputClasses}
+                    value={client.whatsapp}
+                    onChange={(e) => setSaisieClient({ ...client, whatsapp: e.target.value })}
+                    placeholder="Si différent du téléphone"
+                    inputMode="tel"
+                  />
+                </Field>
+              </div>
+              <Field label="Email" error={erreursClient.email}>
+                <input
+                  className={inputClasses}
+                  type="email"
+                  value={client.email}
+                  onChange={(e) => setSaisieClient({ ...client, email: e.target.value })}
+                  placeholder="vous@exemple.com"
+                  autoComplete="email"
+                />
+              </Field>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="rounded-xl bg-brume p-4">
         <CartSummary articles={state.articles} articlesPersonnalises={state.articlesPersonnalises} />
@@ -194,7 +315,7 @@ export default function StepPaiement() {
 
       <div className="flex justify-between">
         {!state.orderResult && (
-          <Button type="button" variant="ghost" onClick={() => router.push("/commander/delai")}>
+          <Button type="button" variant="ghost" onClick={() => router.push("/commander/adresse")}>
             Retour
           </Button>
         )}

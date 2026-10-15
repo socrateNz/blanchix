@@ -4,8 +4,8 @@ import { getSessionUser } from "@/lib/session";
 import User from "@/models/User";
 
 /**
- * Coordonnées du client connecté — utilisé pour préremplir l'étape "Vos informations" du
- * tunnel de commande (voir commander/informations/page.tsx), pas exposé plus largement.
+ * Coordonnées du client connecté — utilisé pour préremplir les coordonnées à l'étape
+ * "Confirmation" du tunnel de commande (voir commander/paiement/page.tsx), pas exposé plus largement.
  */
 export async function GET() {
   const sessionUser = await getSessionUser();
