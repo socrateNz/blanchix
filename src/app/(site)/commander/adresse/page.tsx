@@ -8,12 +8,10 @@ import { MapPin, Check } from "lucide-react";
 import { api } from "@/lib/axios";
 import { useCommande } from "@/context/useCommande";
 import type { AdresseDraft } from "@/context/commandeReducer";
-import { useSlots } from "@/hooks/useSlots";
 import { formatZoneAdresse } from "@/lib/adresse";
 import { DELAI_LABELS, MAJORATION_DELAI_TAUX, type Delai } from "@/lib/pricing-constants";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
-import CreneauPicker from "@/components/commander/CreneauPicker";
 import AdresseFields from "@/components/commander/AdresseFields";
 
 interface AdresseEnregistree {
@@ -78,15 +76,6 @@ export default function StepCollecte() {
       }
     : adresse;
 
-  // Le premier créneau libre est présélectionné ; un créneau déjà choisi est conservé tant
-  // qu'il est encore proposé (un brouillon ancien peut pointer vers un créneau passé/complet).
-  const { data: slots } = useSlots("collecte");
-  const [creneauChoisi, setCreneauChoisi] = useState(state.creneauCollecteId);
-  const creneauId =
-    creneauChoisi && slots?.some((s) => s.id === creneauChoisi && !s.complet)
-      ? creneauChoisi
-      : (slots?.find((s) => !s.complet)?.id ?? null);
-
   const enregistrement = useMutation({
     mutationFn: async () => {
       await api.post("/mes-adresses", adresse);
@@ -98,10 +87,6 @@ export default function StepCollecte() {
     e.preventDefault();
     if (!adresseCollecte.zoneId || !adresseCollecte.lieuDit.trim()) {
       setError("La zone et le lieu-dit de collecte sont requis.");
-      return;
-    }
-    if (!creneauId) {
-      setError("Choisissez un créneau de collecte.");
       return;
     }
     if (livraisonDifferente && (!adresseLivraison.zoneId || !adresseLivraison.lieuDit.trim())) {
@@ -118,7 +103,6 @@ export default function StepCollecte() {
     }
 
     dispatch({ type: "SET_ADRESSE_COLLECTE", adresse: adresseCollecte });
-    dispatch({ type: "SET_CRENEAU_COLLECTE", creneauId });
     dispatch({ type: "SET_DELAI", delai });
     dispatch({ type: "SET_ADRESSE_LIVRAISON_DIFFERENTE", value: livraisonDifferente });
     dispatch({
@@ -132,7 +116,9 @@ export default function StepCollecte() {
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       <div>
         <h1 className="font-display text-2xl font-bold text-marine">Collecte et livraison</h1>
-        <p className="mt-1 font-body text-sm text-ardoise">Où et quand venons-nous récupérer votre linge ?</p>
+        <p className="mt-1 font-body text-sm text-ardoise">
+          Où venons-nous récupérer votre linge ? Nous vous contactons pour convenir de l’heure.
+        </p>
       </div>
 
       {verificationEnCours && <p className="font-body text-sm text-ardoise">Chargement…</p>}
@@ -192,18 +178,6 @@ export default function StepCollecte() {
           )}
         </div>
       )}
-
-      <div>
-        <span className="font-body text-sm font-semibold text-marine">Créneau de collecte</span>
-        {creneauId && !creneauChoisi && (
-          <p className="mt-0.5 font-body text-xs text-ardoise">
-            Le prochain créneau disponible est présélectionné — touchez-en un autre pour changer.
-          </p>
-        )}
-        <div className="mt-2">
-          <CreneauPicker type="collecte" selectedId={creneauId} onSelect={setCreneauChoisi} />
-        </div>
-      </div>
 
       <div>
         <span className="font-body text-sm font-semibold text-marine">Délai de traitement</span>

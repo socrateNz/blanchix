@@ -4,8 +4,6 @@
 // donc src/lib/mongodb.ts lirait process.env.MONGODB_URI avant qu'il soit peuplé.
 import bcrypt from "bcryptjs";
 import { dbConnect } from "../src/lib/mongodb";
-import { genererCreneauxAVenir, JOURS_A_VENIR } from "../src/services/slots";
-import { PLAGES_HORAIRES } from "../src/lib/slots-constants";
 import CatalogItem from "../src/models/CatalogItem";
 import User from "../src/models/User";
 
@@ -33,11 +31,6 @@ async function seedCatalog() {
   console.log(`Catalogue : ${STARTER_CATALOG.length} articles seedés.`);
 }
 
-async function seedSlots() {
-  const count = await genererCreneauxAVenir();
-  console.log(`Créneaux : ${count} créneaux seedés (${JOURS_A_VENIR} jours × ${PLAGES_HORAIRES.length} plages, collecte uniquement).`);
-}
-
 async function seedAdmin() {
   const existing = await User.findOne({ email: ADMIN_EMAIL });
   if (existing) {
@@ -59,7 +52,6 @@ async function seedAdmin() {
 async function main() {
   await dbConnect();
   await seedCatalog();
-  await seedSlots();
   await seedAdmin();
   console.log("Seed terminé.");
   process.exit(0);

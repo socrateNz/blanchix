@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbConnect } from "@/lib/mongodb";
 import CatalogItem from "@/models/CatalogItem";
-import DeliverySlot from "@/models/DeliverySlot";
 import DeliveryZone from "@/models/DeliveryZone";
 import Order from "@/models/Order";
 import User from "@/models/User";
@@ -45,20 +44,8 @@ export async function POST(request: NextRequest) {
     };
   });
 
-  // 2. Le créneau doit exister, correspondre au bon type et avoir de la place. Plus de créneau
-  // de livraison à valider ici — seule la collecte reste planifiée par créneau.
-  const creneauCollecte = await DeliverySlot.findOne({ _id: data.creneauCollecteId, type: "collecte" });
-
-  if (!creneauCollecte) {
-    return NextResponse.json({ error: "Créneau de collecte introuvable." }, { status: 400 });
-  }
-
-  if (creneauCollecte.statut === "bloque" || creneauCollecte.reserves >= creneauCollecte.capaciteMax) {
-    return NextResponse.json(
-      { error: "Le créneau de collecte sélectionné n'est plus disponible. Merci d'en choisir un autre." },
-      { status: 409 }
-    );
-  }
+  // 2. Plus de créneau à valider ni à réserver : les créneaux de collecte ont été retirés
+  // (comme ceux de livraison avant eux) — Blanchix organise la collecte avec le client.
 
   // 2bis. Les deux zones de livraison (collecte + livraison, potentiellement différentes) —
   // jamais confiance au nom/prix envoyé par le client, résolus depuis la zone active en base
@@ -153,21 +140,10 @@ export async function POST(request: NextRequest) {
       gps: data.adresseLivraison.gps,
       instructions: data.adresseLivraison.instructions,
     },
-    creneauCollecte: creneauCollecte._id,
     delai: data.delai,
     notesClient: data.notesClient,
     ...totaux,
   });
-
-  // 5. Réservation atomique du créneau, seulement si toujours de la place.
-  const creneauMaj = await DeliverySlot.findOneAndUpdate(
-    { _id: creneauCollecte._id, reserves: { $lt: creneauCollecte.capaciteMax } },
-    { $inc: { reserves: 1 } },
-    { new: true }
-  );
-  if (creneauMaj && creneauMaj.reserves >= creneauMaj.capaciteMax) {
-    await DeliverySlot.updateOne({ _id: creneauMaj._id }, { $set: { statut: "complet" } });
-  }
 
   return NextResponse.json(
     {

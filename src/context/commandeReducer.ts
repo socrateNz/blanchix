@@ -39,7 +39,6 @@ export interface OrderResult {
 export interface CommandeState {
   client: ClientDraft;
   adresseCollecte: AdresseDraft;
-  creneauCollecteId: string | null;
   articles: ArticlePanier[];
   articlesPersonnalises: ArticlePersonnaliseDraft[];
   notesClient: string;
@@ -52,7 +51,6 @@ export interface CommandeState {
 export const initialCommandeState: CommandeState = {
   client: { nom: "", telephone: "", email: "", whatsapp: "" },
   adresseCollecte: { zoneId: "", lieuDit: "", instructions: "" },
-  creneauCollecteId: null,
   articles: [],
   articlesPersonnalises: [],
   notesClient: "",
@@ -66,7 +64,6 @@ export type CommandeAction =
   | { type: "HYDRATE"; state: CommandeState }
   | { type: "SET_CLIENT"; client: ClientDraft }
   | { type: "SET_ADRESSE_COLLECTE"; adresse: AdresseDraft }
-  | { type: "SET_CRENEAU_COLLECTE"; creneauId: string }
   | { type: "SET_ARTICLE_QTY"; article: Omit<ArticlePanier, "quantite">; quantite: number }
   | { type: "REMPLACER_ARTICLES"; articles: ArticlePanier[] }
   | { type: "ADD_ARTICLE_PERSONNALISE"; article: ArticlePersonnaliseDraft }
@@ -86,8 +83,6 @@ export function commandeReducer(state: CommandeState, action: CommandeAction): C
       return { ...state, client: action.client };
     case "SET_ADRESSE_COLLECTE":
       return { ...state, adresseCollecte: action.adresse };
-    case "SET_CRENEAU_COLLECTE":
-      return { ...state, creneauCollecteId: action.creneauId };
     case "SET_ARTICLE_QTY": {
       const sansArticle = state.articles.filter(
         (a) => a.catalogItemId !== action.article.catalogItemId

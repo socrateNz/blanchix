@@ -69,7 +69,9 @@ const OrderSchema = new Schema(
 
     adresseCollecte: { type: AdresseCommandeSchema, required: true },
     adresseLivraison: { type: AdresseCommandeSchema, required: true },
-    creneauCollecte: { type: Schema.Types.ObjectId, ref: "DeliverySlot", required: true },
+    // Créneaux de collecte retirés à leur tour (2026-10-21) : champ conservé, optionnel, pour
+    // l'affichage des commandes existantes qui en portent un — plus jamais écrit.
+    creneauCollecte: { type: Schema.Types.ObjectId, ref: "DeliverySlot", default: null },
     // Plus de créneau de livraison programmé (retiré — seule la collecte reste planifiée par
     // créneau) : champ laissé optionnel plutôt que supprimé pour ne pas invalider les
     // commandes existantes qui en portent déjà un.

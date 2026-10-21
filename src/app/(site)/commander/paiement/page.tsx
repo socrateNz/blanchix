@@ -42,10 +42,10 @@ export default function StepPaiement() {
   const { data: session } = useSession();
 
   useEffect(() => {
-    if (hydrated && !state.orderResult && (!state.delai || !state.creneauCollecteId)) {
+    if (hydrated && !state.orderResult && !state.delai) {
       router.replace("/commander/adresse");
     }
-  }, [hydrated, state.orderResult, state.delai, state.creneauCollecteId, router]);
+  }, [hydrated, state.orderResult, state.delai, router]);
 
   const { data: mesInfos } = useQuery({
     queryKey: ["mes-infos"],
@@ -86,7 +86,6 @@ export default function StepPaiement() {
         client,
         adresseCollecte: state.adresseCollecte,
         adresseLivraison: state.adresseLivraison,
-        creneauCollecteId: state.creneauCollecteId,
         articles: state.articles.map((a) => ({ catalogItemId: a.catalogItemId, quantite: a.quantite })),
         articlesPersonnalises: state.articlesPersonnalises,
         notesClient: state.notesClient,

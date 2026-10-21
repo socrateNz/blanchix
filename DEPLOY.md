@@ -18,9 +18,8 @@ plan (MongoDB en conteneur) qui n'a pas été retenu. Ils ne servent pas sur tac
 | Configuration | `~/apps/blanchix-partage/.env` (chmod 600, dossier 700) |
 | Nginx | `/etc/nginx/sites-available/blanchix.cm` — copie de référence : `deploy/nginx/blanchix.cm` |
 | Déploiement | `~/scripts/deployer-blanchix.sh [commit]` — copie de référence : `deploy/scripts/` |
-| Tâche planifiée | `~/scripts/taches-blanchix.sh generate-slots`, chaque jour à 5 h (crontab d'`etarcosdev`) |
-| Secret de la tâche | `~/.secrets/blanchix-cron-entete` (en-tête `Authorization: Bearer <CRON_SECRET>`) |
-| Journaux | `~/apps/deploiements.log`, `~/apps/blanchix-taches.log`, `pm2 logs blanchix` |
+| Tâches planifiées | aucune (les créneaux de collecte, seule tâche quotidienne, ont été retirés le 21/10/2026) |
+| Journaux | `~/apps/deploiements.log`, `pm2 logs blanchix` |
 
 Entrée PM2 :
 
