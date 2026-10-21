@@ -30,8 +30,10 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - name: Lint
         run: npx eslint src
+      # next-env.d.ts (gitignoré) et les types de routes (PageProps, LayoutProps, imports
+      # d'images) ne sont générés que par next dev/build/typegen : sans typegen, tsc échoue ici.
       - name: Typage
-        run: npx tsc --noEmit
+        run: npx next typegen && npx tsc --noEmit
       - name: Compilation
         run: npm run build
 
