@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, Search, X } from "lucide-react";
 import { api } from "@/lib/axios";
 import { useCommande } from "@/context/useCommande";
 import type { ArticlePanier } from "@/context/commandeReducer";
@@ -16,6 +16,11 @@ import CartSummary from "@/components/commander/CartSummary";
 import ArticlePersonnaliseForm from "@/components/commander/ArticlePersonnaliseForm";
 import { formatFCFA } from "@/lib/utils";
 import { vibrer } from "@/lib/haptics";
+
+// Recherche insensible à la casse et aux accents : « chemise delicate » trouve « Chemise délicate ».
+function normaliser(texte: string) {
+  return texte.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+}
 
 interface CommandePassee {
   id: string;
@@ -31,6 +36,7 @@ export default function StepPanier() {
 
   const [notes, setNotes] = useState(state.notesClient);
   const [error, setError] = useState("");
+  const [recherche, setRecherche] = useState("");
 
   const { data: mesCommandes } = useQuery({
     queryKey: ["mes-commandes"],
@@ -73,6 +79,7 @@ export default function StepPanier() {
   }
 
   function updateQuantite(item: { id: string; nom: string; prixUnitaire: number }, quantite: number) {
+    setError("");
     dispatch({
       type: "SET_ARTICLE_QTY",
       article: { catalogItemId: item.id, nom: item.nom, prixUnitaire: item.prixUnitaire },
@@ -80,19 +87,25 @@ export default function StepPanier() {
     });
   }
 
+  const termes = normaliser(recherche).split(/\s+/).filter(Boolean);
+  const catalogueFiltre = (catalog ?? []).filter((item) => {
+    const cible = normaliser(`${item.nom} ${item.categorie ?? ""}`);
+    return termes.every((t) => cible.includes(t));
+  });
+
   const sousTotal = state.articles.reduce((sum, a) => sum + a.prixUnitaire * a.quantite, 0);
   const commandeMinimale = settings?.commandeMinimale ?? 0;
   const montantManquant = Math.max(0, commandeMinimale - sousTotal);
 
   function handleContinuer() {
     if (state.articles.length === 0 && state.articlesPersonnalises.length === 0) {
+      vibrer([30, 40, 30]);
       setError("Ajoutez au moins un article avant de continuer.");
       return;
     }
     if (montantManquant > 0) {
-      setError(
-        `Il manque ${formatFCFA(montantManquant)} pour atteindre le minimum de commande de ${formatFCFA(commandeMinimale)}.`
-      );
+      vibrer([30, 40, 30]);
+      setError(`Ajoutez encore ${formatFCFA(montantManquant)} d’articles pour continuer.`);
       return;
     }
     dispatch({ type: "SET_NOTES_CLIENT", notes });
@@ -134,9 +147,42 @@ export default function StepPanier() {
         <p className="font-body text-sm text-alerte">Impossible de charger le catalogue pour le moment.</p>
       )}
 
+      {catalog && catalog.length > 0 && (
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ardoise/60" />
+          <input
+            type="text"
+            inputMode="search"
+            className={`${inputClasses} pl-9 pr-9`}
+            value={recherche}
+            onChange={(e) => setRecherche(e.target.value)}
+            placeholder="Rechercher un vêtement (ex. chemise, couette…)"
+            aria-label="Rechercher dans le catalogue"
+            enterKeyHint="search"
+          />
+          {recherche && (
+            <button
+              type="button"
+              onClick={() => setRecherche("")}
+              aria-label="Effacer la recherche"
+              className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-ardoise hover:bg-brume"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      )}
+
+      {catalog && catalogueFiltre.length === 0 && recherche.trim() && (
+        <p className="font-body text-sm text-ardoise">
+          Aucun article ne correspond à « {recherche.trim()} ». Vous pouvez l’ajouter ci-dessous comme
+          article personnalisé (prix confirmé par Blanchix).
+        </p>
+      )}
+
       {catalog && (
         <div className="flex flex-col divide-y divide-ardoise/10">
-          {catalog.map((item) => {
+          {catalogueFiltre.map((item) => {
             const quantite = getQuantite(item.id);
             return (
               <div key={item.id} className="flex items-center justify-between py-3">
@@ -176,7 +222,10 @@ export default function StepPanier() {
       )}
 
       <ArticlePersonnaliseForm
-        onAdd={(article) => dispatch({ type: "ADD_ARTICLE_PERSONNALISE", article })}
+        onAdd={(article) => {
+          setError("");
+          dispatch({ type: "ADD_ARTICLE_PERSONNALISE", article });
+        }}
       />
 
       {state.articlesPersonnalises.length > 0 && (
@@ -214,26 +263,32 @@ export default function StepPanier() {
 
       <div className="rounded-xl bg-brume p-4">
         <CartSummary articles={state.articles} articlesPersonnalises={state.articlesPersonnalises} />
-        {montantManquant > 0 && (
-          <p className="mt-2 font-body text-xs font-semibold text-attente">
-            Il manque {formatFCFA(montantManquant)} pour atteindre le minimum de commande de{" "}
-            {formatFCFA(commandeMinimale)}.
-          </p>
-        )}
       </div>
 
-      {error && <p className="font-body text-xs text-alerte">{error}</p>}
-
       {/* Toujours visible pendant le défilement du catalogue — au-dessus de la barre d'onglets
-          mobile (72px, cf. TabBar), en bas de l'écran sur desktop. */}
-      <div className="sticky bottom-[calc(84px+env(safe-area-inset-bottom))] z-20 -mx-2 flex items-center justify-between gap-3 rounded-xl border border-marine/10 bg-white/95 p-3 shadow-lg backdrop-blur sm:bottom-4">
-        <div>
-          <p className="font-body text-xs text-ardoise">Sous-total</p>
-          <p className="font-mono text-base font-bold text-marine">{formatFCFA(sousTotal)}</p>
+          mobile (72px, cf. TabBar), en bas de l'écran sur desktop. Le minimum de commande et les
+          erreurs s'affichent ICI, à côté du bouton : affichés plus bas dans la page, ils restaient
+          hors de l'écran et le bouton semblait ne rien faire (constaté en production). */}
+      <div className="sticky bottom-[calc(84px+env(safe-area-inset-bottom))] z-20 -mx-2 rounded-xl border border-marine/10 bg-white/95 p-3 shadow-lg backdrop-blur sm:bottom-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-body text-xs text-ardoise">Sous-total</p>
+            <p className="font-mono text-base font-bold text-marine">{formatFCFA(sousTotal)}</p>
+            {montantManquant > 0 && (
+              <p className="font-body text-[11px] font-semibold text-attente">
+                Minimum {formatFCFA(commandeMinimale)} — encore {formatFCFA(montantManquant)}
+              </p>
+            )}
+          </div>
+          <Button type="button" onClick={handleContinuer} className="shrink-0">
+            Continuer
+          </Button>
         </div>
-        <Button type="button" onClick={handleContinuer}>
-          Continuer
-        </Button>
+        {error && (
+          <p role="alert" className="mt-2 border-t border-ardoise/10 pt-2 font-body text-xs font-semibold text-alerte">
+            {error}
+          </p>
+        )}
       </div>
     </div>
   );
