@@ -1,0 +1,27 @@
+# Blanchix : application Next.js (127.0.0.1:3002, PM2) sur blanchix.cm.
+# www.blanchix.cm redirige vers blanchix.cm : NEXTAUTH_URL et les retours Codees utilisent
+# l'adresse sans www, une session ouverte sur www ne fonctionnerait pas.
+# HTTPS ajouté ensuite par : sudo certbot --nginx -d blanchix.cm -d www.blanchix.cm --redirect
+server {
+    listen 80;
+    server_name www.blanchix.cm;
+    return 301 https://blanchix.cm$request_uri;
+}
+
+server {
+    listen 80;
+    server_name blanchix.cm;
+
+    client_max_body_size 2m;
+
+    location / {
+        proxy_pass http://127.0.0.1:3002;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;   # écrase la valeur du client : non falsifiable
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 90s;
+    }
+}
