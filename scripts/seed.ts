@@ -2,6 +2,7 @@
 // npm "seed" (package.json). Un `import { config } from "dotenv"` ici ne suffirait pas : les
 // imports ES sont hoistés au-dessus du reste du fichier, y compris devant un appel à config(),
 // donc src/lib/mongodb.ts lirait process.env.MONGODB_URI avant qu'il soit peuplé.
+import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { dbConnect } from "../src/lib/mongodb";
 import CatalogItem from "../src/models/CatalogItem";
@@ -18,7 +19,9 @@ const STARTER_CATALOG = [
 ];
 
 const ADMIN_EMAIL = "admin@blanchix.com";
-const ADMIN_PASSWORD_PAR_DEFAUT = "blanchix-admin-2026";
+// Jamais de mot de passe écrit ici (dépôt public) : ADMIN_SEED_PASSWORD si défini, sinon un mot
+// de passe aléatoire affiché une seule fois. Changement ultérieur : scripts/admin-mot-de-passe.ts.
+const ADMIN_PASSWORD = process.env.ADMIN_SEED_PASSWORD || randomBytes(18).toString("base64url");
 
 async function seedCatalog() {
   for (const item of STARTER_CATALOG) {
@@ -38,7 +41,7 @@ async function seedAdmin() {
     return;
   }
 
-  const passwordHash = await bcrypt.hash(ADMIN_PASSWORD_PAR_DEFAUT, 10);
+  const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 10);
   await User.create({
     nom: "Admin Blanchix",
     telephone: "+237600000000",
@@ -46,7 +49,11 @@ async function seedAdmin() {
     role: "super_admin",
     passwordHash,
   });
-  console.log(`Admin : ${ADMIN_EMAIL} créé — mot de passe par défaut "${ADMIN_PASSWORD_PAR_DEFAUT}" (à changer dès la mise en place de l'authentification).`);
+  console.log(
+    process.env.ADMIN_SEED_PASSWORD
+      ? `Admin : ${ADMIN_EMAIL} créé avec ADMIN_SEED_PASSWORD.`
+      : `Admin : ${ADMIN_EMAIL} créé — mot de passe généré (noté nulle part ailleurs) : ${ADMIN_PASSWORD}`
+  );
 }
 
 async function main() {
