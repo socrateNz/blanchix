@@ -20,6 +20,6 @@ export type Delai = keyof typeof MAJORATION_DELAI_TAUX;
 
 export const DELAI_LABELS: Record<Delai, { label: string; duree: string }> = {
   premium: { label: "Premium", duree: "12 h" },
-  express: { label: "Express", duree: "1 jour" },
+  express: { label: "Express", duree: "24 h" },
   standard: { label: "Standard", duree: "5 jours" },
 };
