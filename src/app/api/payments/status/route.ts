@@ -29,9 +29,18 @@ export async function GET(request: NextRequest) {
   const payment = await Payment.findOne({ order: order._id }).sort({ createdAt: -1 });
 
   if (payment && (payment.statut === "initie" || payment.statut === "en_attente")) {
-    await expirerPaiementSiDepasse(payment, PAIEMENT_EXPIRATION_MS);
-    if (payment.statut === "initie" || payment.statut === "en_attente") {
+    // Codees d'abord, l'expiration locale ensuite : dans l'ordre inverse, un client qui a
+    // réellement payé mais dont la page n'a été consultée qu'après 30 min était déclaré
+    // "expiré" sans que Codees soit jamais interrogé (et risquait de payer une seconde fois).
+    try {
       await verifierEtAppliquerPaiement(payment);
+    } catch (err) {
+      // Panne passagère de Codees : jamais d'erreur 500 vers le navigateur du client, qui
+      // réinterroge de toute façon quelques secondes plus tard.
+      console.error("Vérification Codees impossible pendant le suivi du paiement :", err);
+    }
+    if (payment.statut === "initie" || payment.statut === "en_attente") {
+      await expirerPaiementSiDepasse(payment, PAIEMENT_EXPIRATION_MS);
     }
   }
 
