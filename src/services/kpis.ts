@@ -2,7 +2,7 @@ import Order from "@/models/Order";
 import Payment from "@/models/Payment";
 
 const STATUTS_EN_COURS = ["COLLECTE_PLANIFIEE", "COLLECTEE", "EN_LAVAGE", "EN_REPASSAGE", "PRETE"];
-const STATUTS_PAYES = [
+export const STATUTS_PAYES = [
   "PAYEE",
   "COLLECTE_PLANIFIEE",
   "COLLECTEE",

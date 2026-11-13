@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { Search, Eye } from "lucide-react";
@@ -9,6 +9,7 @@ import { formatFCFA } from "@/lib/utils";
 import {
   STATUTS_COMMANDE_AFFICHE,
   STATUT_COMMANDE_AFFICHE_LABELS,
+  STATUT_LABELS,
   deriveStatutCommandeAffiche,
   type OrderStatus,
 } from "@/lib/orderStatuses";
@@ -37,6 +38,14 @@ export default function AdminCommandesPage() {
   const [qSoumis, setQSoumis] = useState("");
   const [statut, setStatut] = useState("");
   const [page, setPage] = useState(1);
+
+  // Filtre initial depuis l'URL (?statut=…), utilisé par les liens « Voir les N » du tableau de
+  // bord. Lu après montage (pas via useSearchParams, qui imposerait un Suspense), et différé
+  // comme ailleurs dans le code (react-hooks/set-state-in-effect).
+  useEffect(() => {
+    const depuisUrl = new URLSearchParams(window.location.search).get("statut");
+    if (depuisUrl) Promise.resolve().then(() => setStatut(depuisUrl));
+  }, []);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["admin-commandes", qSoumis, statut, page],
@@ -86,6 +95,11 @@ export default function AdminCommandesPage() {
               {STATUT_COMMANDE_AFFICHE_LABELS[s].label}
             </option>
           ))}
+          {/* Statut détaillé venu d'un lien du tableau de bord (ex. EN_ATTENTE_PAIEMENT) : absent
+              des statuts simplifiés, ajouté ici pour que le filtre actif reste visible. */}
+          {statut && !(STATUTS_COMMANDE_AFFICHE as readonly string[]).includes(statut) && (
+            <option value={statut}>{STATUT_LABELS[statut as OrderStatus]?.label ?? statut}</option>
+          )}
         </select>
         <Button type="submit" variant="secondary">
           Rechercher
